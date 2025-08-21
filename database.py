@@ -152,9 +152,19 @@ class Chamado(db.Model):
     data_conclusao = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='Aberto')
     prioridade = db.Column(db.String(20), default='Normal')
-    
+
     # Nova coluna para vincular ao usuário
     usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    # Novas colunas para reabertura e transferência
+    chamado_origem_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=True)
+    reaberto = db.Column(db.Boolean, default=False)
+    numero_reaberturas = db.Column(db.Integer, default=0)
+    transferido = db.Column(db.Boolean, default=False)
+    numero_transferencias = db.Column(db.Integer, default=0)
+    agente_atual_id = db.Column(db.Integer, db.ForeignKey('agentes_suporte.id'), nullable=True)
+    data_ultima_transferencia = db.Column(db.DateTime, nullable=True)
+    _metadados_extras = db.Column('metadados_extras', db.Text, nullable=True)
 
     def get_data_abertura_brazil(self):
         """Retorna data de abertura no timezone do Brasil"""
@@ -184,6 +194,161 @@ class Chamado(db.Model):
             else:
                 # Assumir que data sem timezone já está no horário do Brasil
                 return BRAZIL_TZ.localize(self.data_conclusao)
+        return None
+
+    @property
+    def metadados_extras(self):
+        """Retorna metadados extras como dict"""
+        if self._metadados_extras:
+            try:
+                return json.loads(self._metadados_extras)
+            except:
+                return {}
+        return {}
+
+    @metadados_extras.setter
+    def metadados_extras(self, value):
+        """Define metadados extras a partir de dict"""
+        if value:
+            self._metadados_extras = json.dumps(value)
+        else:
+            self._metadados_extras = None
+
+    def pode_ser_reaberto(self, dias_limite=7):
+        """Verifica se o chamado pode ser reaberto baseado nos critérios"""
+        if self.status not in ['Concluido', 'Cancelado']:
+            return False, "Chamado deve estar concluído ou cancelado"
+
+        if not self.data_conclusao:
+            return False, "Chamado não possui data de conclusão"
+
+        # Verificar se está dentro do prazo
+        from datetime import timedelta
+        prazo_limite = self.data_conclusao + timedelta(days=dias_limite)
+        if get_brazil_time().replace(tzinfo=None) > prazo_limite:
+            return False, f"Prazo de {dias_limite} dias para reabertura expirado"
+
+        return True, "Chamado pode ser reaberto"
+
+    def reabrir_chamado(self, usuario_id, motivo=None):
+        """Reabre o chamado criando um novo registro vinculado"""
+        pode_reabrir, mensagem = self.pode_ser_reaberto()
+        if not pode_reabrir:
+            return None, mensagem
+
+        try:
+            # Criar novo chamado baseado no original
+            novo_chamado = Chamado(
+                codigo=self._gerar_codigo_reabertura(),
+                protocolo=self._gerar_protocolo_reabertura(),
+                solicitante=self.solicitante,
+                cargo=self.cargo,
+                email=self.email,
+                telefone=self.telefone,
+                unidade=self.unidade,
+                problema=self.problema,
+                internet_item=self.internet_item,
+                descricao=f"REABERTURA: {self.descricao}",
+                prioridade=self.prioridade,
+                usuario_id=usuario_id,
+                chamado_origem_id=self.id,
+                reaberto=True,
+                status='Aberto'
+            )
+
+            db.session.add(novo_chamado)
+            db.session.flush()  # Para obter o ID
+
+            # Criar registro de reabertura
+            reabertura = ChamadoReabertura(
+                chamado_original_id=self.id,
+                chamado_reaberto_id=novo_chamado.id,
+                usuario_id=usuario_id,
+                motivo=motivo,
+                problema_similar=self.problema
+            )
+            reabertura.calcular_dias_entre_chamados()
+
+            # Atualizar contador de reaberturas no chamado original
+            self.numero_reaberturas = (self.numero_reaberturas or 0) + 1
+
+            db.session.add(reabertura)
+            db.session.commit()
+
+            return novo_chamado, "Chamado reaberto com sucesso"
+
+        except Exception as e:
+            db.session.rollback()
+            return None, f"Erro ao reabrir chamado: {str(e)}"
+
+    def _gerar_codigo_reabertura(self):
+        """Gera código para chamado reaberto"""
+        import random
+        import string
+        return f"R{self.codigo[1:]}-{''.join(random.choices(string.digits, k=2))}"
+
+    def _gerar_protocolo_reabertura(self):
+        """Gera protocolo para chamado reaberto"""
+        import random
+        import string
+        return f"R{self.protocolo[1:]}-{''.join(random.choices(string.digits, k=2))}"
+
+    def transferir_para_agente(self, agente_id, usuario_transferencia_id, motivo=None, observacoes=None):
+        """Transfere o chamado para outro agente"""
+        try:
+            agente_atual = self.agente_atual_id
+            agente_novo = agente_id
+
+            # Criar registro de transferência
+            transferencia = TransferenciaHistorico(
+                chamado_id=self.id,
+                agente_anterior_id=agente_atual,
+                agente_novo_id=agente_novo,
+                usuario_transferencia_id=usuario_transferencia_id,
+                motivo_transferencia=motivo,
+                observacoes=observacoes,
+                status_anterior=self.status,
+                status_novo=self.status,  # Mantém o mesmo status
+                prioridade_anterior=self.prioridade,
+                prioridade_nova=self.prioridade,  # Mantém a mesma prioridade
+                tipo_transferencia='manual'
+            )
+
+            # Atualizar chamado
+            self.agente_atual_id = agente_novo
+            self.transferido = True
+            self.numero_transferencias = (self.numero_transferencias or 0) + 1
+            self.data_ultima_transferencia = get_brazil_time().replace(tzinfo=None)
+
+            db.session.add(transferencia)
+            db.session.commit()
+
+            return transferencia, "Chamado transferido com sucesso"
+
+        except Exception as e:
+            db.session.rollback()
+            return None, f"Erro ao transferir chamado: {str(e)}"
+
+    def get_historico_transferencias(self):
+        """Retorna histórico de transferências do chamado"""
+        return TransferenciaHistorico.query.filter_by(
+            chamado_id=self.id
+        ).order_by(TransferenciaHistorico.data_transferencia.desc()).all()
+
+    def get_reaberturas(self):
+        """Retorna todas as reaberturas deste chamado"""
+        return ChamadoReabertura.query.filter_by(
+            chamado_original_id=self.id
+        ).order_by(ChamadoReabertura.data_reabertura.desc()).all()
+
+    def eh_reabertura(self):
+        """Verifica se este chamado é uma reabertura"""
+        return self.reaberto and self.chamado_origem_id is not None
+
+    def get_chamado_original(self):
+        """Retorna o chamado original se este for uma reabertura"""
+        if self.eh_reabertura():
+            return Chamado.query.get(self.chamado_origem_id)
         return None
 
     def __repr__(self):
@@ -841,7 +1006,7 @@ class SessaoAtiva(db.Model):
     ultima_atividade = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
     ativo = db.Column(db.Boolean, default=True)
 
-    # Informações de localização
+    # Informaç��es de localização
     pais = db.Column(db.String(100), nullable=True)
     cidade = db.Column(db.String(100), nullable=True)
     navegador = db.Column(db.String(100), nullable=True)
@@ -1032,6 +1197,123 @@ class ConfiguracaoSLA(db.Model):
 
     def __repr__(self):
         return f'<ConfiguracaoSLA {self.prioridade} - {self.tempo_resolucao}h>'
+
+class ChamadoReabertura(db.Model):
+    """Tabela para controle de reaberturas de chamados"""
+    __tablename__ = 'chamado_reabertura'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chamado_original_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=False)
+    chamado_reaberto_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    motivo = db.Column(db.Text, nullable=True)
+    data_reabertura = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
+    dias_entre_chamados = db.Column(db.Integer, nullable=True)
+    problema_similar = db.Column(db.String(255), nullable=True)
+    observacoes = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='ativo')
+
+    # Relacionamentos
+    chamado_original = db.relationship('Chamado', foreign_keys=[chamado_original_id], backref='reaberturas_originadas')
+    chamado_reaberto = db.relationship('Chamado', foreign_keys=[chamado_reaberto_id], backref='reabertura_de')
+    usuario = db.relationship('User', backref='reaberturas_solicitadas')
+
+    def get_data_reabertura_brazil(self):
+        """Retorna data de reabertura no timezone do Brasil"""
+        if self.data_reabertura:
+            if self.data_reabertura.tzinfo:
+                return self.data_reabertura.astimezone(BRAZIL_TZ)
+            else:
+                return BRAZIL_TZ.localize(self.data_reabertura)
+        return None
+
+    def calcular_dias_entre_chamados(self):
+        """Calcula dias entre o chamado original e a reabertura"""
+        if self.chamado_original and self.chamado_original.data_conclusao and self.data_reabertura:
+            delta = self.data_reabertura.date() - self.chamado_original.data_conclusao.date()
+            self.dias_entre_chamados = delta.days
+            return self.dias_entre_chamados
+        return None
+
+    def __repr__(self):
+        return f'<ChamadoReabertura {self.id} - Original:{self.chamado_original_id} -> Reaberto:{self.chamado_reaberto_id}>'
+
+class TransferenciaHistorico(db.Model):
+    """Tabela para histórico detalhado de transferências de chamados"""
+    __tablename__ = 'transferencia_historico'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chamado_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=False)
+    transferido_de_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    transferido_para_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    usuario_transferencia_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    data_transferencia = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
+    motivo_transferencia = db.Column(db.Text, nullable=True)
+    observacoes = db.Column(db.Text, nullable=True)
+    status_anterior = db.Column(db.String(50), nullable=True)
+    status_novo = db.Column(db.String(50), nullable=True)
+    prioridade_anterior = db.Column(db.String(20), nullable=True)
+    prioridade_nova = db.Column(db.String(20), nullable=True)
+    agente_anterior_id = db.Column(db.Integer, db.ForeignKey('agentes_suporte.id'), nullable=True)
+    agente_novo_id = db.Column(db.Integer, db.ForeignKey('agentes_suporte.id'), nullable=True)
+    tipo_transferencia = db.Column(db.String(50), default='manual')  # manual, automatica, escalacao
+    notificacoes_enviadas = db.Column(db.Boolean, default=False)
+    _metadados = db.Column('metadados', db.Text, nullable=True)  # JSON string
+
+    # Relacionamentos
+    chamado = db.relationship('Chamado', backref='transferencias_historico')
+    transferido_de = db.relationship('User', foreign_keys=[transferido_de_id], backref='transferencias_enviadas')
+    transferido_para = db.relationship('User', foreign_keys=[transferido_para_id], backref='transferencias_recebidas')
+    usuario_transferencia = db.relationship('User', foreign_keys=[usuario_transferencia_id], backref='transferencias_executadas')
+    agente_anterior = db.relationship('AgenteSuporte', foreign_keys=[agente_anterior_id], backref='transferencias_de')
+    agente_novo = db.relationship('AgenteSuporte', foreign_keys=[agente_novo_id], backref='transferencias_para')
+
+    @property
+    def metadados(self):
+        """Retorna metadados como dict"""
+        if self._metadados:
+            try:
+                return json.loads(self._metadados)
+            except:
+                return {}
+        return {}
+
+    @metadados.setter
+    def metadados(self, value):
+        """Define metadados a partir de dict"""
+        if value:
+            self._metadados = json.dumps(value)
+        else:
+            self._metadados = None
+
+    def get_data_transferencia_brazil(self):
+        """Retorna data de transferência no timezone do Brasil"""
+        if self.data_transferencia:
+            if self.data_transferencia.tzinfo:
+                return self.data_transferencia.astimezone(BRAZIL_TZ)
+            else:
+                return BRAZIL_TZ.localize(self.data_transferencia)
+        return None
+
+    def get_tempo_entre_transferencia(self):
+        """Calcula tempo entre a transferência anterior e esta"""
+        transferencia_anterior = TransferenciaHistorico.query.filter_by(
+            chamado_id=self.chamado_id
+        ).filter(
+            TransferenciaHistorico.data_transferencia < self.data_transferencia
+        ).order_by(TransferenciaHistorico.data_transferencia.desc()).first()
+
+        if transferencia_anterior:
+            delta = self.data_transferencia - transferencia_anterior.data_transferencia
+            return int(delta.total_seconds() / 3600)  # em horas
+        return None
+
+    def enviar_notificacoes(self):
+        """Marca notificações como enviadas"""
+        self.notificacoes_enviadas = True
+
+    def __repr__(self):
+        return f'<TransferenciaHistorico {self.id} - Chamado:{self.chamado_id} - {self.tipo_transferencia}>'
 
 def init_app(app):
     db.init_app(app)

@@ -690,17 +690,766 @@ def chamados_recentes():
 @setor_required('ti')
 def ajuda():
     faqs = [
-        ("Como abrir um novo chamado?", 
+        ("Como abrir um novo chamado?",
          "<ol><li>Acesse o menu 'Abrir Chamado'</li><li>Preencha todos os campos obrigatórios</li><li>Clique em 'Enviar'</li><li>Anote o número do protocolo para acompanhamento</li></ol>"),
-        ("Como acompanhar um chamado existente?", 
+        ("Como acompanhar um chamado existente?",
          "<ol><li>Acesse o menu 'Meus Chamados'</li><li>Digite o número do protocolo</li><li>Clique em 'Buscar'</li><li>Você verá o status atual e histórico</li></ol>"),
-        ("O que fazer se esquecer o número do protocolo?", 
+        ("O que fazer se esquecer o número do protocolo?",
          "<ul><li>Verifique seu e-mail - enviamos uma confirmação</li><li>Contate o suporte TI com seus dados</li><li>Forneça data aproximada e detalhes do problema</li></ul>"),
-        ("Quanto tempo leva para um chamado ser atendido?", 
+        ("Quanto tempo leva para um chamado ser atendido?",
          "<p>O tempo varia conforme a prioridade:</p><ul><li><strong>Crítico</strong>: 1 hora</li><li><strong>Alta</strong>: 4 horas</li><li><strong>Normal</strong>: 24 horas</li><li><strong>Baixa</strong>: 72 horas</li></ul>"),
-        ("Como classificar a prioridade do meu chamado?", 
+        ("Como classificar a prioridade do meu chamado?",
          "<p>Use estas diretrizes:</p><ul><li><strong>Crítico</strong>: Sistema totalmente inoperante</li><li><strong>Alta</strong>: Funcionalidade principal afetada</li><li><strong>Normal</strong>: Problema não impede operação</li><li><strong>Baixa</strong>: Dúvida ou melhoria</li></ul>"),
-        ("Posso anexar arquivos ao chamado?", 
+        ("Posso anexar arquivos ao chamado?",
          "<p>Sim, na versão premium do sistema. Atualmente você pode:</p><ul><li>Descrever detalhadamente o problema</li><li>Incluir prints na descrição</li><li>Enviar arquivos posteriormente por e-mail</li></ul>")
     ]
     return render_template('ajuda.html', faqs=faqs)
+
+# ==================== NOVAS FUNCIONALIDADES - REABERTURA E TRANSFERÊNCIA ====================
+
+@ti_bp.route('/api/chamados/verificar-reabertura', methods=['POST'])
+@login_required
+@setor_required('ti')
+def verificar_reabertura():
+    """Verifica se um novo chamado pode ser convertido em reabertura"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        problema = data.get('problema')
+        dias_limite = data.get('dias_limite', 7)
+
+        if not email or not problema:
+            return jsonify({
+                'status': 'error',
+                'message': 'Email e problema são obrigatórios'
+            }), 400
+
+        # Buscar chamados similares concluídos nos últimos X dias
+        from datetime import timedelta
+        limite_data = get_brazil_time() - timedelta(days=dias_limite)
+
+        chamados_similares = Chamado.query.filter(
+            Chamado.email == email,
+            Chamado.problema == problema,
+            Chamado.status.in_(['Concluido', 'Cancelado']),
+            Chamado.data_conclusao >= limite_data.replace(tzinfo=None)
+        ).order_by(Chamado.data_conclusao.desc()).all()
+
+        if chamados_similares:
+            chamado_candidato = chamados_similares[0]
+            pode_reabrir, motivo = chamado_candidato.pode_ser_reaberto(dias_limite)
+
+            return jsonify({
+                'status': 'success',
+                'pode_reabrir': pode_reabrir,
+                'chamado_original': {
+                    'id': chamado_candidato.id,
+                    'codigo': chamado_candidato.codigo,
+                    'protocolo': chamado_candidato.protocolo,
+                    'data_conclusao': chamado_candidato.data_conclusao.strftime('%d/%m/%Y %H:%M') if chamado_candidato.data_conclusao else None,
+                    'problema': chamado_candidato.problema,
+                    'descricao': chamado_candidato.descricao
+                },
+                'motivo': motivo,
+                'dias_desde_conclusao': (get_brazil_time().replace(tzinfo=None) - chamado_candidato.data_conclusao).days if chamado_candidato.data_conclusao else None
+            })
+        else:
+            return jsonify({
+                'status': 'success',
+                'pode_reabrir': False,
+                'motivo': 'Nenhum chamado similar encontrado no período especificado'
+            })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao verificar reabertura: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/chamados/reabrir', methods=['POST'])
+@login_required
+@setor_required('ti')
+def reabrir_chamado():
+    """Reabre um chamado existente"""
+    try:
+        data = request.get_json()
+        chamado_original_id = data.get('chamado_original_id')
+        motivo = data.get('motivo', '')
+        observacoes_adicionais = data.get('observacoes_adicionais', '')
+
+        if not chamado_original_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'ID do chamado original é obrigatório'
+            }), 400
+
+        chamado_original = Chamado.query.get(chamado_original_id)
+        if not chamado_original:
+            return jsonify({
+                'status': 'error',
+                'message': 'Chamado original não encontrado'
+            }), 404
+
+        # Verificar permissões - apenas o próprio usuário ou administradores
+        if chamado_original.usuario_id != current_user.id and not current_user.tem_permissao('Administrador'):
+            return jsonify({
+                'status': 'error',
+                'message': 'Você não tem permissão para reabrir este chamado'
+            }), 403
+
+        # Reabrir o chamado
+        novo_chamado, resultado = chamado_original.reabrir_chamado(
+            usuario_id=current_user.id,
+            motivo=f"{motivo}\n\nObservações adicionais: {observacoes_adicionais}" if observacoes_adicionais else motivo
+        )
+
+        if novo_chamado:
+            # Notificar via Socket.IO
+            if hasattr(current_app, 'socketio'):
+                current_app.socketio.emit('chamado_reaberto', {
+                    'novo_chamado': {
+                        'id': novo_chamado.id,
+                        'codigo': novo_chamado.codigo,
+                        'protocolo': novo_chamado.protocolo,
+                        'solicitante': novo_chamado.solicitante
+                    },
+                    'chamado_original': {
+                        'id': chamado_original.id,
+                        'codigo': chamado_original.codigo,
+                        'protocolo': chamado_original.protocolo
+                    }
+                })
+
+            # Log da ação
+            from database import registrar_log_acao
+            registrar_log_acao(
+                usuario_id=current_user.id,
+                acao='Reabertura de chamado',
+                categoria='chamado',
+                detalhes=f'Chamado {chamado_original.codigo} reaberto como {novo_chamado.codigo}',
+                recurso_afetado=novo_chamado.id,
+                tipo_recurso='chamado',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+
+            return jsonify({
+                'status': 'success',
+                'message': resultado,
+                'novo_chamado': {
+                    'id': novo_chamado.id,
+                    'codigo': novo_chamado.codigo,
+                    'protocolo': novo_chamado.protocolo,
+                    'status': novo_chamado.status,
+                    'data_abertura': novo_chamado.data_abertura.strftime('%d/%m/%Y %H:%M') if novo_chamado.data_abertura else None
+                }
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': resultado
+            }), 400
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao reabrir chamado: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/chamados/<int:chamado_id>/reaberturas', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_reaberturas(chamado_id):
+    """Obtém histórico de reaberturas de um chamado"""
+    try:
+        chamado = Chamado.query.get(chamado_id)
+        if not chamado:
+            return jsonify({
+                'status': 'error',
+                'message': 'Chamado não encontrado'
+            }), 404
+
+        # Verificar permissões
+        if not current_user.tem_permissao('Administrador') and chamado.usuario_id != current_user.id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Sem permissão para visualizar este chamado'
+            }), 403
+
+        reaberturas = chamado.get_reaberturas()
+
+        reaberturas_data = []
+        for reabertura in reaberturas:
+            reaberturas_data.append({
+                'id': reabertura.id,
+                'chamado_reaberto': {
+                    'id': reabertura.chamado_reaberto.id,
+                    'codigo': reabertura.chamado_reaberto.codigo,
+                    'protocolo': reabertura.chamado_reaberto.protocolo,
+                    'status': reabertura.chamado_reaberto.status
+                },
+                'usuario': {
+                    'id': reabertura.usuario.id,
+                    'nome': f"{reabertura.usuario.nome} {reabertura.usuario.sobrenome}"
+                },
+                'data_reabertura': reabertura.get_data_reabertura_brazil().strftime('%d/%m/%Y %H:%M:%S') if reabertura.data_reabertura else None,
+                'dias_entre_chamados': reabertura.dias_entre_chamados,
+                'motivo': reabertura.motivo,
+                'observacoes': reabertura.observacoes,
+                'status': reabertura.status
+            })
+
+        return jsonify({
+            'status': 'success',
+            'reaberturas': reaberturas_data,
+            'total': len(reaberturas_data)
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter reaberturas: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/chamados/<int:chamado_id>/transferir', methods=['POST'])
+@login_required
+@setor_required('ti')
+def transferir_chamado(chamado_id):
+    """Transfere um chamado para outro agente"""
+    try:
+        data = request.get_json()
+        agente_destino_id = data.get('agente_destino_id')
+        motivo = data.get('motivo', '')
+        observacoes = data.get('observacoes', '')
+
+        if not agente_destino_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'Agente de destino é obrigatório'
+            }), 400
+
+        chamado = Chamado.query.get(chamado_id)
+        if not chamado:
+            return jsonify({
+                'status': 'error',
+                'message': 'Chamado não encontrado'
+            }), 404
+
+        # Verificar se o usuário tem permissão para transferir
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return jsonify({
+                'status': 'error',
+                'message': 'Você não tem permissão para transferir chamados'
+            }), 403
+
+        # Verificar se o agente de destino existe e está ativo
+        from database import AgenteSuporte
+        agente_destino = AgenteSuporte.query.get(agente_destino_id)
+        if not agente_destino or not agente_destino.ativo:
+            return jsonify({
+                'status': 'error',
+                'message': 'Agente de destino inválido ou inativo'
+            }), 400
+
+        # Verificar se o agente pode receber mais chamados
+        if not agente_destino.pode_receber_chamado():
+            return jsonify({
+                'status': 'error',
+                'message': f'Agente {agente_destino.usuario.nome} já atingiu o limite de chamados simultâneos'
+            }), 400
+
+        # Executar transferência
+        transferencia, resultado = chamado.transferir_para_agente(
+            agente_id=agente_destino_id,
+            usuario_transferencia_id=current_user.id,
+            motivo=motivo,
+            observacoes=observacoes
+        )
+
+        if transferencia:
+            # Notificar via Socket.IO
+            if hasattr(current_app, 'socketio'):
+                current_app.socketio.emit('chamado_transferido', {
+                    'chamado': {
+                        'id': chamado.id,
+                        'codigo': chamado.codigo,
+                        'protocolo': chamado.protocolo
+                    },
+                    'agente_anterior': {
+                        'id': transferencia.agente_anterior.id if transferencia.agente_anterior else None,
+                        'nome': f"{transferencia.agente_anterior.usuario.nome} {transferencia.agente_anterior.usuario.sobrenome}" if transferencia.agente_anterior else 'Não atribuído'
+                    },
+                    'agente_novo': {
+                        'id': agente_destino.id,
+                        'nome': f"{agente_destino.usuario.nome} {agente_destino.usuario.sobrenome}"
+                    },
+                    'motivo': motivo
+                })
+
+            # Log da ação
+            from database import registrar_log_acao
+            registrar_log_acao(
+                usuario_id=current_user.id,
+                acao='Transferência de chamado',
+                categoria='chamado',
+                detalhes=f'Chamado {chamado.codigo} transferido para {agente_destino.usuario.nome}',
+                recurso_afetado=chamado.id,
+                tipo_recurso='chamado',
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+
+            return jsonify({
+                'status': 'success',
+                'message': resultado,
+                'transferencia': {
+                    'id': transferencia.id,
+                    'agente_destino': {
+                        'id': agente_destino.id,
+                        'nome': f"{agente_destino.usuario.nome} {agente_destino.usuario.sobrenome}",
+                        'email': agente_destino.usuario.email
+                    },
+                    'data_transferencia': transferencia.get_data_transferencia_brazil().strftime('%d/%m/%Y %H:%M:%S'),
+                    'motivo': motivo
+                }
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': resultado
+            }), 400
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao transferir chamado: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/chamados/<int:chamado_id>/transferencias', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_transferencias(chamado_id):
+    """Obtém histórico de transferências de um chamado"""
+    try:
+        chamado = Chamado.query.get(chamado_id)
+        if not chamado:
+            return jsonify({
+                'status': 'error',
+                'message': 'Chamado não encontrado'
+            }), 404
+
+        # Verificar permissões
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return jsonify({
+                'status': 'error',
+                'message': 'Sem permissão para visualizar histórico de transferências'
+            }), 403
+
+        transferencias = chamado.get_historico_transferencias()
+
+        transferencias_data = []
+        for transferencia in transferencias:
+            transferencias_data.append({
+                'id': transferencia.id,
+                'data_transferencia': transferencia.get_data_transferencia_brazil().strftime('%d/%m/%Y %H:%M:%S'),
+                'agente_anterior': {
+                    'id': transferencia.agente_anterior.id if transferencia.agente_anterior else None,
+                    'nome': f"{transferencia.agente_anterior.usuario.nome} {transferencia.agente_anterior.usuario.sobrenome}" if transferencia.agente_anterior else 'Não atribuído',
+                    'email': transferencia.agente_anterior.usuario.email if transferencia.agente_anterior else None
+                },
+                'agente_novo': {
+                    'id': transferencia.agente_novo.id if transferencia.agente_novo else None,
+                    'nome': f"{transferencia.agente_novo.usuario.nome} {transferencia.agente_novo.usuario.sobrenome}" if transferencia.agente_novo else 'Não atribuído',
+                    'email': transferencia.agente_novo.usuario.email if transferencia.agente_novo else None
+                },
+                'usuario_transferencia': {
+                    'id': transferencia.usuario_transferencia.id,
+                    'nome': f"{transferencia.usuario_transferencia.nome} {transferencia.usuario_transferencia.sobrenome}"
+                },
+                'motivo_transferencia': transferencia.motivo_transferencia,
+                'observacoes': transferencia.observacoes,
+                'tipo_transferencia': transferencia.tipo_transferencia,
+                'status_anterior': transferencia.status_anterior,
+                'status_novo': transferencia.status_novo,
+                'prioridade_anterior': transferencia.prioridade_anterior,
+                'prioridade_nova': transferencia.prioridade_nova,
+                'tempo_entre_transferencias': transferencia.get_tempo_entre_transferencia()
+            })
+
+        return jsonify({
+            'status': 'success',
+            'transferencias': transferencias_data,
+            'total': len(transferencias_data),
+            'chamado': {
+                'id': chamado.id,
+                'codigo': chamado.codigo,
+                'numero_transferencias': chamado.numero_transferencias,
+                'agente_atual': {
+                    'id': chamado.agente_atual_id,
+                    'nome': f"{chamado.agente_atribuido[0].agente.usuario.nome} {chamado.agente_atribuido[0].agente.usuario.sobrenome}" if chamado.agente_atribuido else None
+                } if chamado.agente_atual_id else None
+            }
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter transferências: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/agentes/disponiveis', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_agentes_disponiveis():
+    """Obtém lista de agentes disponíveis para transferência"""
+    try:
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return jsonify({
+                'status': 'error',
+                'message': 'Sem permissão para visualizar agentes'
+            }), 403
+
+        from database import AgenteSuporte
+        agentes = AgenteSuporte.query.filter_by(ativo=True).all()
+
+        agentes_data = []
+        for agente in agentes:
+            chamados_ativos = agente.get_chamados_ativos()
+            pode_receber = agente.pode_receber_chamado()
+
+            agentes_data.append({
+                'id': agente.id,
+                'usuario': {
+                    'id': agente.usuario.id,
+                    'nome': f"{agente.usuario.nome} {agente.usuario.sobrenome}",
+                    'email': agente.usuario.email
+                },
+                'nivel_experiencia': agente.nivel_experiencia,
+                'especialidades': agente.especialidades_list,
+                'chamados_ativos': chamados_ativos,
+                'max_chamados_simultaneos': agente.max_chamados_simultaneos,
+                'pode_receber_chamado': pode_receber,
+                'disponibilidade_percentual': round((1 - (chamados_ativos / agente.max_chamados_simultaneos)) * 100, 1) if agente.max_chamados_simultaneos > 0 else 0
+            })
+
+        # Ordenar por disponibilidade
+        agentes_data.sort(key=lambda x: x['disponibilidade_percentual'], reverse=True)
+
+        return jsonify({
+            'status': 'success',
+            'agentes': agentes_data,
+            'total': len(agentes_data)
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter agentes disponíveis: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/historico/chamados', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_historico_chamados():
+    """Obtém histórico de chamados com filtros e paginação"""
+    try:
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return jsonify({
+                'status': 'error',
+                'message': 'Sem permissão para visualizar histórico'
+            }), 403
+
+        # Parâmetros de paginação
+        pagina = int(request.args.get('pagina', 1))
+        itens_por_pagina = int(request.args.get('itens_por_pagina', 20))
+
+        # Filtros
+        filtros = {
+            'solicitante': request.args.get('solicitante', ''),
+            'problema': request.args.get('problema', ''),
+            'status': request.args.get('status', ''),
+            'reaberto': request.args.get('reaberto', ''),
+            'data_inicio': request.args.get('data_inicio', ''),
+            'data_fim': request.args.get('data_fim', ''),
+            'unidade': request.args.get('unidade', '')
+        }
+
+        # Query base
+        query = Chamado.query
+
+        # Aplicar filtros
+        if filtros['solicitante']:
+            query = query.filter(Chamado.solicitante.contains(filtros['solicitante']))
+
+        if filtros['problema']:
+            query = query.filter(Chamado.problema.contains(filtros['problema']))
+
+        if filtros['status']:
+            query = query.filter(Chamado.status == filtros['status'])
+
+        if filtros['reaberto']:
+            reaberto_bool = filtros['reaberto'].lower() == 'true'
+            query = query.filter(Chamado.reaberto == reaberto_bool)
+
+        if filtros['unidade']:
+            query = query.filter(Chamado.unidade.contains(filtros['unidade']))
+
+        if filtros['data_inicio']:
+            try:
+                data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d')
+                query = query.filter(Chamado.data_abertura >= data_inicio)
+            except ValueError:
+                pass
+
+        if filtros['data_fim']:
+            try:
+                data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d')
+                # Adicionar 1 dia para incluir todo o dia final
+                data_fim = data_fim.replace(hour=23, minute=59, second=59)
+                query = query.filter(Chamado.data_abertura <= data_fim)
+            except ValueError:
+                pass
+
+        # Contagem total
+        total = query.count()
+
+        # Paginação
+        offset = (pagina - 1) * itens_por_pagina
+        chamados = query.order_by(Chamado.data_abertura.desc()).offset(offset).limit(itens_por_pagina).all()
+
+        # Serializar dados
+        chamados_data = []
+        for chamado in chamados:
+            # Verificar se pode reabrir
+            pode_reabrir = False
+            if chamado.status in ['Concluido', 'Cancelado']:
+                pode_reabrir, _ = chamado.pode_ser_reaberto()
+
+            chamados_data.append({
+                'id': chamado.id,
+                'codigo': chamado.codigo,
+                'protocolo': chamado.protocolo,
+                'solicitante': chamado.solicitante,
+                'problema': chamado.problema,
+                'status': chamado.status,
+                'prioridade': chamado.prioridade,
+                'data_abertura': chamado.data_abertura.isoformat() if chamado.data_abertura else None,
+                'data_conclusao': chamado.data_conclusao.isoformat() if chamado.data_conclusao else None,
+                'reaberto': chamado.reaberto or False,
+                'numero_reaberturas': chamado.numero_reaberturas or 0,
+                'transferido': chamado.transferido or False,
+                'numero_transferencias': chamado.numero_transferencias or 0,
+                'pode_reabrir': pode_reabrir
+            })
+
+        # Estatísticas
+        total_reabertos = Chamado.query.filter(Chamado.reaberto == True).count()
+        total_concluidos = Chamado.query.filter(Chamado.status == 'Concluido').count()
+        total_geral = Chamado.query.count()
+
+        taxa_resolucao = round((total_concluidos / total_geral * 100), 1) if total_geral > 0 else 0
+
+        # Calcular tempo médio (simplificado)
+        tempo_medio = 24  # Placeholder - implementar cálculo real
+
+        estatisticas = {
+            'total': total,
+            'reabertos': total_reabertos,
+            'taxa_resolucao': taxa_resolucao,
+            'tempo_medio': tempo_medio
+        }
+
+        return jsonify({
+            'status': 'success',
+            'chamados': chamados_data,
+            'total': total,
+            'estatisticas': estatisticas,
+            'pagina': pagina,
+            'itens_por_pagina': itens_por_pagina
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter histórico de chamados: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/historico/transferencias', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_historico_transferencias():
+    """Obtém histórico de transferências com filtros e paginação"""
+    try:
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return jsonify({
+                'status': 'error',
+                'message': 'Sem permissão para visualizar histórico'
+            }), 403
+
+        from database import TransferenciaHistorico, AgenteSuporte
+
+        # Parâmetros de paginação
+        pagina = int(request.args.get('pagina', 1))
+        itens_por_pagina = int(request.args.get('itens_por_pagina', 20))
+
+        # Filtros
+        filtros = {
+            'chamado': request.args.get('chamado', ''),
+            'agente_origem': request.args.get('agente_origem', ''),
+            'agente_destino': request.args.get('agente_destino', ''),
+            'tipo': request.args.get('tipo', ''),
+            'data_inicio': request.args.get('data_inicio', ''),
+            'data_fim': request.args.get('data_fim', '')
+        }
+
+        # Query base
+        query = TransferenciaHistorico.query.join(Chamado)
+
+        # Aplicar filtros
+        if filtros['chamado']:
+            query = query.filter(Chamado.codigo.contains(filtros['chamado']))
+
+        if filtros['agente_origem']:
+            query = query.filter(TransferenciaHistorico.agente_anterior_id == filtros['agente_origem'])
+
+        if filtros['agente_destino']:
+            query = query.filter(TransferenciaHistorico.agente_novo_id == filtros['agente_destino'])
+
+        if filtros['tipo']:
+            query = query.filter(TransferenciaHistorico.tipo_transferencia == filtros['tipo'])
+
+        if filtros['data_inicio']:
+            try:
+                data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d')
+                query = query.filter(TransferenciaHistorico.data_transferencia >= data_inicio)
+            except ValueError:
+                pass
+
+        if filtros['data_fim']:
+            try:
+                data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d')
+                data_fim = data_fim.replace(hour=23, minute=59, second=59)
+                query = query.filter(TransferenciaHistorico.data_transferencia <= data_fim)
+            except ValueError:
+                pass
+
+        # Contagem total
+        total = query.count()
+
+        # Paginação
+        offset = (pagina - 1) * itens_por_pagina
+        transferencias = query.order_by(TransferenciaHistorico.data_transferencia.desc()).offset(offset).limit(itens_por_pagina).all()
+
+        # Serializar dados
+        transferencias_data = []
+        for transferencia in transferencias:
+            transferencias_data.append({
+                'id': transferencia.id,
+                'data_transferencia': transferencia.data_transferencia.isoformat() if transferencia.data_transferencia else None,
+                'chamado': {
+                    'id': transferencia.chamado.id,
+                    'codigo': transferencia.chamado.codigo,
+                    'solicitante': transferencia.chamado.solicitante,
+                    'problema': transferencia.chamado.problema
+                },
+                'agente_anterior': {
+                    'id': transferencia.agente_anterior.id if transferencia.agente_anterior else None,
+                    'nome': f"{transferencia.agente_anterior.usuario.nome} {transferencia.agente_anterior.usuario.sobrenome}" if transferencia.agente_anterior else None
+                },
+                'agente_novo': {
+                    'id': transferencia.agente_novo.id if transferencia.agente_novo else None,
+                    'nome': f"{transferencia.agente_novo.usuario.nome} {transferencia.agente_novo.usuario.sobrenome}" if transferencia.agente_novo else None
+                },
+                'usuario_transferencia': {
+                    'id': transferencia.usuario_transferencia.id,
+                    'nome': f"{transferencia.usuario_transferencia.nome} {transferencia.usuario_transferencia.sobrenome}"
+                },
+                'tipo_transferencia': transferencia.tipo_transferencia,
+                'motivo_transferencia': transferencia.motivo_transferencia,
+                'observacoes': transferencia.observacoes,
+                'status_anterior': transferencia.status_anterior,
+                'status_novo': transferencia.status_novo,
+                'prioridade_anterior': transferencia.prioridade_anterior,
+                'prioridade_nova': transferencia.prioridade_nova,
+                'tempo_entre_transferencias': transferencia.get_tempo_entre_transferencia(),
+                'metadados': transferencia.metadados
+            })
+
+        # Estatísticas
+        total_hoje = TransferenciaHistorico.query.filter(
+            TransferenciaHistorico.data_transferencia >= datetime.now().date()
+        ).count()
+
+        # Agente mais ativo (simplificado)
+        agente_mais_ativo = "João Silva"  # Placeholder
+
+        estatisticas = {
+            'total': total,
+            'hoje': total_hoje,
+            'agente_mais_ativo': agente_mais_ativo,
+            'tempo_medio': 2  # Placeholder
+        }
+
+        # Dados para gráficos (simplificado)
+        graficos = {
+            'periodo': {
+                'labels': ['01/12', '02/12', '03/12', '04/12', '05/12'],
+                'dados': [2, 5, 3, 8, 4]
+            },
+            'tipos': {
+                'labels': ['Manual', 'Automática', 'Escalação'],
+                'dados': [60, 25, 15]
+            }
+        }
+
+        return jsonify({
+            'status': 'success',
+            'transferencias': transferencias_data,
+            'total': total,
+            'estatisticas': estatisticas,
+            'graficos': graficos,
+            'pagina': pagina,
+            'itens_por_pagina': itens_por_pagina
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter histórico de transferências: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/unidades', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_unidades():
+    """Obtém lista de unidades"""
+    try:
+        unidades = Unidade.query.order_by(Unidade.nome).all()
+
+        unidades_data = []
+        for unidade in unidades:
+            unidades_data.append({
+                'id': unidade.id,
+                'nome': unidade.nome
+            })
+
+        return jsonify({
+            'status': 'success',
+            'unidades': unidades_data,
+            'total': len(unidades_data)
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter unidades: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500

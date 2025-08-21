@@ -238,7 +238,7 @@ function activateSection(id) {
                 }
             });
 
-            // Ativar a seção alvo
+            // Ativar a se��ão alvo
             section.classList.add('active');
             section.setAttribute('tabindex', '0');
 
@@ -935,25 +935,52 @@ function attachCardEventListeners() {
     });
 }
 
-// Event listener para os links do submenu de gerenciar chamados
-document.querySelectorAll('#submenu-gerenciar-chamados a').forEach(link => {
-    link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const status = this.getAttribute('data-status');
-        currentFilter = status;
-        currentPage = 1;
-        renderChamadosPage(currentPage);
-        activateSection('gerenciar-chamados');
-        
-        // Atualizar o item ativo no menu
-        document.querySelectorAll('.sidebar a.active').forEach(item => {
-            item.classList.remove('active');
+// Função para inicializar event listeners do submenu gerenciar-chamados
+function initializeGerenciarChamadosListeners() {
+    console.log('🔄 Inicializando listeners do submenu gerenciar-chamados...');
+
+    const submenuLinks = document.querySelectorAll('#submenu-gerenciar-chamados a');
+    console.log(`📋 Encontrados ${submenuLinks.length} links no submenu gerenciar-chamados`);
+
+    submenuLinks.forEach((link, index) => {
+        console.log(`📌 Link ${index}: href="${link.getAttribute('href')}", data-status="${link.getAttribute('data-status')}"`);
+
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const status = this.getAttribute('data-status');
+            console.log(`🎯 Filtro selecionado: ${status}`);
+
+            currentFilter = status;
+            currentPage = 1;
+
+            // Verificar se os dados já foram carregados
+            if (chamadosData && chamadosData.length > 0) {
+                renderChamadosPage(currentPage);
+            } else {
+                console.log('📥 Carregando dados dos chamados...');
+                loadChamados();
+            }
+
+            activateSection('gerenciar-chamados');
+
+            // Atualizar o item ativo no menu
+            document.querySelectorAll('.sidebar a.active').forEach(item => {
+                item.classList.remove('active');
+            });
+            this.classList.add('active');
+            const parentSubmenuToggle = this.closest('.submenu').previousElementSibling;
+            if (parentSubmenuToggle) {
+                parentSubmenuToggle.classList.add('active');
+            }
         });
-        this.classList.add('active');
-        const parentSubmenuToggle = this.closest('.submenu').previousElementSibling;
-        parentSubmenuToggle.classList.add('active');
     });
-});
+
+    if (submenuLinks.length === 0) {
+        console.warn('⚠️ Nenhum link encontrado no submenu gerenciar-chamados');
+    } else {
+        console.log('✅ Listeners do submenu gerenciar-chamados inicializados com sucesso');
+    }
+}
 
 // Modal Chamado - Elementos
 const modal = document.getElementById('modalChamado');
@@ -1580,7 +1607,7 @@ async function loadUsuarios() {
     }
 }
 
-// Função para renderizar a página de usuários
+// Função para renderizar a página de usu��rios
 function renderUsuariosPage(page) {
     usuariosGrid.innerHTML = '';
     const start = (page - 1) * usuariosPerPage;
@@ -2142,7 +2169,7 @@ function loadSectionContent(sectionId) {
             // Carregar grupos de usuários
             console.log('Carregando seção de grupos de usuários...');
             if (typeof inicializarGrupos === 'function') {
-                console.log('Função inicializarGrupos encontrada, executando...');
+                console.log('Funç��o inicializarGrupos encontrada, executando...');
                 inicializarGrupos();
             } else if (typeof carregarGrupos === 'function') {
                 console.log('Função carregarGrupos encontrada, executando...');
