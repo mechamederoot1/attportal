@@ -707,7 +707,7 @@
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="alterarSenhaPrimeiroAcesso" checked>
               <label class="form-check-label" for="alterarSenhaPrimeiroAcesso">
-                Solicitar alteração de senha no primeiro acesso
+                Solicitar alteraç��o de senha no primeiro acesso
               </label>
             </div>
 
@@ -3078,7 +3078,7 @@
 
                 console.log('Navegação manual configurada com sucesso!');
             } else {
-                console.error('Elementos de navegaç��o não encontrados!');
+                console.error('Elementos de navegaç����o não encontrados!');
             }
         }, 500);
     });
@@ -4064,7 +4064,7 @@ async function debugChamados() {
             console.log('✅ Chamados:', chamadosData.length, 'encontrados');
             console.log('Primeiros 2 chamados:', chamadosData.slice(0, 2));
         } else {
-            console.error('❌ Erro nos chamados:', chamadosResponse.status);
+            console.error('��� Erro nos chamados:', chamadosResponse.status);
         }
 
     } catch (error) {
@@ -4117,5 +4117,9 @@ function testarIntegracaoSLA() {
   <!-- Módulos de Reabertura e Transferências -->
   <script src="{{ url_for('static', filename='ti/js/painel/reabertura.js') }}"></script>
   <script src="{{ url_for('static', filename='ti/js/painel/transferencias.js') }}"></script>
+
+  <!-- Módulos de Histórico -->
+  <script src="{{ url_for('static', filename='ti/js/painel/historico-chamados.js') }}"></script>
+  <script src="{{ url_for('static', filename='ti/js/painel/historico-transferencias.js') }}"></script>
 </body>
 </html>
