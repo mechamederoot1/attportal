@@ -95,7 +95,7 @@ a {
   transition: all var(--transition-speed) ease;
 }
 
-/* ============ SE��ÃO: SIDEBAR ============ */
+/* ============ SE����ÃO: SIDEBAR ============ */
 .sidebar {
   position: fixed;
   top: 0;
@@ -519,39 +519,23 @@ h2::after {
 /* ============ SEÇÃO: CARDS GERAIS (Chamados e Usuários) ============ */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 1.5rem;
-  margin: 1.5rem 0;
-}
-
-@media (max-width: 768px) {
-  .cards-grid {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-    margin: 1rem 0;
-  }
-}
-
-@media (min-width: 1400px) {
-  .cards-grid {
-    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-    gap: 2rem;
-  }
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+  margin: var(--spacing-lg) 0;
 }
 
 /* Estilos base para qualquer card de chamado ou usuário */
 .chamado-card, .usuario-card {
   background: var(--card-bg);
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid var(--border-color);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--transition-speed) ease;
   display: flex;
   flex-direction: column;
   color: var(--light-color);
   position: relative;
-  backdrop-filter: blur(10px);
 }
 
 .chamado-card::before, .usuario-card::before {
@@ -568,8 +552,8 @@ h2::after {
 }
 
 .chamado-card:hover, .usuario-card:hover {
-  transform: translateY(-8px) scale(1.01);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   border-color: var(--primary-color);
 }
 
