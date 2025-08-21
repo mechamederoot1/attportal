@@ -152,9 +152,19 @@ class Chamado(db.Model):
     data_conclusao = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='Aberto')
     prioridade = db.Column(db.String(20), default='Normal')
-    
+
     # Nova coluna para vincular ao usuário
     usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+
+    # Novas colunas para reabertura e transferência
+    chamado_origem_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=True)
+    reaberto = db.Column(db.Boolean, default=False)
+    numero_reaberturas = db.Column(db.Integer, default=0)
+    transferido = db.Column(db.Boolean, default=False)
+    numero_transferencias = db.Column(db.Integer, default=0)
+    agente_atual_id = db.Column(db.Integer, db.ForeignKey('agentes_suporte.id'), nullable=True)
+    data_ultima_transferencia = db.Column(db.DateTime, nullable=True)
+    _metadados_extras = db.Column('metadados_extras', db.Text, nullable=True)
 
     def get_data_abertura_brazil(self):
         """Retorna data de abertura no timezone do Brasil"""
@@ -1156,7 +1166,7 @@ def init_app(app):
     with app.app_context():
         db.create_all()
         
-        # Migraç��o: Adicionar usuario_id aos chamados existentes
+        # Migração: Adicionar usuario_id aos chamados existentes
         try:
             # Verificar se a coluna usuario_id existe
             from sqlalchemy import inspect
@@ -1189,7 +1199,7 @@ def init_app(app):
             if not user._setores and user.setor:
                 user._setores = json.dumps([user.setor])
         
-        # Inicializar configurações padrão se n��o existirem
+        # Inicializar configurações padrão se não existirem
         configuracoes_padrao = {
             'chamados': {
                 'auto_atribuicao': False,
