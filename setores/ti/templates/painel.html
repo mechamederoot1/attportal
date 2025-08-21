@@ -1699,23 +1699,343 @@
       </div>
     </section>
 
-    <!-- Histórico -->
-    <section id="historico" class="content-section" tabindex="0" aria-label="Histórico">
-      <h2>Histórico</h2>
-      <div class="table-responsive">
-        <table class="table table-dark table-striped">
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>Ação</th>
-              <th>Usuário</th>
-              <th>Descrição</th>
-            </tr>
-          </thead>
-          <tbody id="tabelaHistorico">
-            <!-- Histórico será carregado aqui dinamicamente -->
-          </tbody>
-        </table>
+    <!-- Histórico de Chamados -->
+    <section id="historico-chamados" class="content-section" tabindex="0" aria-label="Histórico de Chamados">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-ticket-alt me-2"></i>Histórico de Chamados</h2>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-info btn-sm" id="btnFiltrosHistoricoChamados">
+            <i class="fas fa-filter me-1"></i>Filtros
+          </button>
+          <button class="btn btn-primary btn-sm" id="btnAtualizarHistoricoChamados">
+            <i class="fas fa-sync-alt me-1"></i>Atualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="card mb-4" id="filtrosHistoricoChamados" style="display: none;">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="fas fa-filter me-2"></i>Filtros de Pesquisa</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <label for="filtroHistoricoSolicitante">Solicitante</label>
+              <input type="text" class="form-control" id="filtroHistoricoSolicitante" placeholder="Nome do solicitante...">
+            </div>
+            <div class="col-md-3">
+              <label for="filtroHistoricoProblema">Problema</label>
+              <input type="text" class="form-control" id="filtroHistoricoProblema" placeholder="Tipo de problema...">
+            </div>
+            <div class="col-md-2">
+              <label for="filtroHistoricoStatus">Status</label>
+              <select class="form-control" id="filtroHistoricoStatus">
+                <option value="">Todos</option>
+                <option value="Aberto">Aberto</option>
+                <option value="Aguardando">Aguardando</option>
+                <option value="Concluido">Concluído</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label for="filtroHistoricoReaberto">Reaberto</label>
+              <select class="form-control" id="filtroHistoricoReaberto">
+                <option value="">Todos</option>
+                <option value="true">Sim</option>
+                <option value="false">Não</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-secondary w-100" id="btnFiltrarHistoricoChamados">
+                <i class="fas fa-search me-1"></i>Filtrar
+              </button>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-3">
+              <label for="filtroHistoricoDataInicio">Data Início</label>
+              <input type="date" class="form-control" id="filtroHistoricoDataInicio">
+            </div>
+            <div class="col-md-3">
+              <label for="filtroHistoricoDataFim">Data Fim</label>
+              <input type="date" class="form-control" id="filtroHistoricoDataFim">
+            </div>
+            <div class="col-md-3">
+              <label for="filtroHistoricoUnidade">Unidade</label>
+              <select class="form-control" id="filtroHistoricoUnidade">
+                <option value="">Todas</option>
+                <!-- Unidades serão carregadas dinamicamente -->
+              </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-outline-secondary w-100" id="btnLimparFiltrosHistorico">
+                <i class="fas fa-times me-1"></i>Limpar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estatísticas -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body">
+              <h6 class="card-title">Total de Chamados</h6>
+              <h3 id="totalChamadosHistorico">0</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-white">
+            <div class="card-body">
+              <h6 class="card-title">Chamados Reabertos</h6>
+              <h3 id="totalReabertosHistorico">0</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-success text-white">
+            <div class="card-body">
+              <h6 class="card-title">Taxa de Resolução</h6>
+              <h3 id="taxaResolucaoHistorico">0%</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-secondary text-white">
+            <div class="card-body">
+              <h6 class="card-title">Tempo Médio</h6>
+              <h3 id="tempoMedioHistorico">0h</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de Histórico -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Chamados Históricos</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-dark table-striped table-hover">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Solicitante</th>
+                  <th>Problema</th>
+                  <th>Status</th>
+                  <th>Prioridade</th>
+                  <th>Data Abertura</th>
+                  <th>Data Conclusão</th>
+                  <th>Reaberto</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaHistoricoChamados">
+                <!-- Histórico será carregado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Loading -->
+          <div id="loadingHistoricoChamados" class="text-center py-4" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Carregando...</span>
+            </div>
+            <div class="mt-2">Carregando histórico de chamados...</div>
+          </div>
+
+          <!-- Paginação -->
+          <nav aria-label="Navegação do histórico de chamados" class="mt-3">
+            <ul class="pagination pagination-sm justify-content-center" id="paginacaoHistoricoChamados">
+              <!-- Paginação será gerada dinamicamente -->
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </section>
+
+    <!-- Histórico de Transferências -->
+    <section id="historico-transferencias" class="content-section" tabindex="0" aria-label="Histórico de Transferências">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-exchange-alt me-2"></i>Histórico de Transferências</h2>
+        <div class="d-flex gap-2">
+          <button class="btn btn-outline-info btn-sm" id="btnFiltrosHistoricoTransferencias">
+            <i class="fas fa-filter me-1"></i>Filtros
+          </button>
+          <button class="btn btn-primary btn-sm" id="btnAtualizarHistoricoTransferencias">
+            <i class="fas fa-sync-alt me-1"></i>Atualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="card mb-4" id="filtrosHistoricoTransferencias" style="display: none;">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="fas fa-filter me-2"></i>Filtros de Pesquisa</h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3">
+              <label for="filtroTransferenciaChamado">Código do Chamado</label>
+              <input type="text" class="form-control" id="filtroTransferenciaChamado" placeholder="EVQ-0001">
+            </div>
+            <div class="col-md-3">
+              <label for="filtroTransferenciaAgenteOrigem">Agente Origem</label>
+              <select class="form-control" id="filtroTransferenciaAgenteOrigem">
+                <option value="">Todos</option>
+                <!-- Agentes serão carregados dinamicamente -->
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="filtroTransferenciaAgenteDestino">Agente Destino</label>
+              <select class="form-control" id="filtroTransferenciaAgenteDestino">
+                <option value="">Todos</option>
+                <!-- Agentes serão carregados dinamicamente -->
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="filtroTransferenciaTipo">Tipo</label>
+              <select class="form-control" id="filtroTransferenciaTipo">
+                <option value="">Todos</option>
+                <option value="manual">Manual</option>
+                <option value="automatica">Automática</option>
+                <option value="escalacao">Escalação</option>
+              </select>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-md-3">
+              <label for="filtroTransferenciaDataInicio">Data Início</label>
+              <input type="date" class="form-control" id="filtroTransferenciaDataInicio">
+            </div>
+            <div class="col-md-3">
+              <label for="filtroTransferenciaDataFim">Data Fim</label>
+              <input type="date" class="form-control" id="filtroTransferenciaDataFim">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-secondary w-100" id="btnFiltrarHistoricoTransferencias">
+                <i class="fas fa-search me-1"></i>Filtrar
+              </button>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+              <button class="btn btn-outline-secondary w-100" id="btnLimparFiltrosTransferencias">
+                <i class="fas fa-times me-1"></i>Limpar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estatísticas de Transferências -->
+      <div class="row mb-4">
+        <div class="col-md-3">
+          <div class="card bg-info text-white">
+            <div class="card-body">
+              <h6 class="card-title">Total de Transferências</h6>
+              <h3 id="totalTransferenciasHistorico">0</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-warning text-white">
+            <div class="card-body">
+              <h6 class="card-title">Transferências Hoje</h6>
+              <h3 id="transferenciasHojeHistorico">0</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-primary text-white">
+            <div class="card-body">
+              <h6 class="card-title">Agente Mais Ativo</h6>
+              <h3 id="agenteMaisAtivoHistorico">-</h3>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card bg-secondary text-white">
+            <div class="card-body">
+              <h6 class="card-title">Tempo Médio</h6>
+              <h3 id="tempoMedioTransferenciaHistorico">0h</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gráfico de Transferências -->
+      <div class="row mb-4">
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="fas fa-chart-line me-2"></i>Transferências por Período
+              </h5>
+            </div>
+            <div class="card-body">
+              <canvas id="chartTransferenciasPeriodo" height="100"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="card-title mb-0">
+                <i class="fas fa-chart-pie me-2"></i>Tipos de Transferência
+              </h5>
+            </div>
+            <div class="card-body">
+              <canvas id="chartTiposTransferencia"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabela de Transferências -->
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Histórico Detalhado</h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-dark table-striped table-hover">
+              <thead>
+                <tr>
+                  <th>Data/Hora</th>
+                  <th>Chamado</th>
+                  <th>De</th>
+                  <th>Para</th>
+                  <th>Transferido por</th>
+                  <th>Tipo</th>
+                  <th>Motivo</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaHistoricoTransferencias">
+                <!-- Histórico será carregado dinamicamente -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Loading -->
+          <div id="loadingHistoricoTransferencias" class="text-center py-4" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+              <span class="visually-hidden">Carregando...</span>
+            </div>
+            <div class="mt-2">Carregando histórico de transferências...</div>
+          </div>
+
+          <!-- Paginação -->
+          <nav aria-label="Navegação do histórico de transferências" class="mt-3">
+            <ul class="pagination pagination-sm justify-content-center" id="paginacaoHistoricoTransferencias">
+              <!-- Paginação será gerada dinamicamente -->
+            </ul>
+          </nav>
+        </div>
       </div>
     </section>
 
