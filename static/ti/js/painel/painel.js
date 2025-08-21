@@ -77,6 +77,41 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Sistema inicializado com sucesso');
 });
 
+// Function to clear all filters - referenced in empty state
+function limparTodosFiltros() {
+    console.log('🧹 Limpando todos os filtros...');
+
+    // Reset current filter
+    currentFilter = 'all';
+    currentPage = 1;
+
+    // Clear form filters
+    const filtroSolicitante = document.getElementById('filtroSolicitante');
+    const filtroProblema = document.getElementById('filtroProblema');
+    const filtroPrioridade = document.getElementById('filtroPrioridade');
+    const filtroAgenteResponsavel = document.getElementById('filtroAgenteResponsavel');
+    const filtroUnidade = document.getElementById('filtroUnidade');
+    const filtroDataInicio = document.getElementById('filtroDataInicio');
+    const filtroDataFim = document.getElementById('filtroDataFim');
+
+    if (filtroSolicitante) filtroSolicitante.value = '';
+    if (filtroProblema) filtroProblema.value = '';
+    if (filtroPrioridade) filtroPrioridade.value = '';
+    if (filtroAgenteResponsavel) filtroAgenteResponsavel.value = '';
+    if (filtroUnidade) filtroUnidade.value = '';
+    if (filtroDataInicio) filtroDataInicio.value = '';
+    if (filtroDataFim) filtroDataFim.value = '';
+
+    // Re-render with cleared filters
+    if (chamadosData && chamadosData.length > 0) {
+        renderChamadosPage(currentPage);
+    } else {
+        loadChamados();
+    }
+
+    console.log('✅ Filtros limpos');
+}
+
 // Function to test navigation system
 function testNavigationSystem() {
     const tests = [
@@ -3604,7 +3639,7 @@ function inicializarFiltroPermissoes() {
         }
     });
 
-    // Mostrar/esconder ����cone de limpeza
+    // Mostrar/esconder ��cone de limpeza
     filtroInput.addEventListener('input', function() {
         const parentGroup = filtroInput.closest('.input-group');
         if (parentGroup) {
@@ -3729,7 +3764,7 @@ function renderizarUsuarios(usuarios) {
         return;
     }
 
-    // Verificação de segurança para array de usuários
+    // Verifica��ão de segurança para array de usuários
     if (!usuarios || !Array.isArray(usuarios)) {
         console.warn('Array de usuários inválido:', usuarios);
         usuariosGrid.innerHTML = `
@@ -5228,7 +5263,7 @@ function debugSistemaPainel() {
             if (typeof window[funcao] === 'function') {
                 console.log(`✓ ${funcao}: disponível`);
             } else {
-                console.error(`✗ ${funcao}: NÃO DISPONÍVEL`);
+                console.error(`✗ ${funcao}: NÃO DISPON��VEL`);
             }
         });
 
