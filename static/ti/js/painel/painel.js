@@ -70,8 +70,59 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load initial section content
     loadSectionContent('visao-geral');
 
+    // Test navigation functionality
+    console.log('🧪 Testando navegação...');
+    testNavigationSystem();
+
     console.log('✅ Sistema inicializado com sucesso');
 });
+
+// Function to test navigation system
+function testNavigationSystem() {
+    const tests = [
+        'visao-geral',
+        'gerenciar-chamados',
+        'sla-dashboard',
+        'criar-usuario'
+    ];
+
+    console.log('🔍 Testando navegação para seções:', tests);
+
+    let passedTests = 0;
+    tests.forEach(sectionId => {
+        const section = document.getElementById(sectionId);
+        const navLink = document.querySelector(`.sidebar a[href="#${sectionId}"]`);
+
+        if (section && navLink) {
+            console.log(`✅ ${sectionId}: seção e link encontrados`);
+            passedTests++;
+        } else {
+            console.warn(`⚠️ ${sectionId}: ${!section ? 'seção' : 'link'} não encontrada`);
+        }
+    });
+
+    // Test submenu links specifically
+    const submenuLinks = document.querySelectorAll('#submenu-gerenciar-chamados a[data-status]');
+    console.log(`📋 Links do submenu gerenciar-chamados encontrados: ${submenuLinks.length}`);
+
+    if (submenuLinks.length > 0) {
+        submenuLinks.forEach(link => {
+            const status = link.getAttribute('data-status');
+            console.log(`📌 Link de filtro encontrado: ${status}`);
+        });
+        passedTests++;
+    }
+
+    console.log(`🎯 Testes de navegação: ${passedTests}/${tests.length + 1} passaram`);
+
+    if (passedTests === tests.length + 1) {
+        console.log('🎉 Todos os testes de navegação passaram!');
+        return true;
+    } else {
+        console.error('❌ Alguns testes de navegação falharam');
+        return false;
+    }
+}
 
 function initializeNavigation() {
     console.log('=== INICIALIZANDO NAVEGAÇÃO ===');
@@ -3553,7 +3604,7 @@ function inicializarFiltroPermissoes() {
         }
     });
 
-    // Mostrar/esconder ��cone de limpeza
+    // Mostrar/esconder ����cone de limpeza
     filtroInput.addEventListener('input', function() {
         const parentGroup = filtroInput.closest('.input-group');
         if (parentGroup) {
