@@ -196,6 +196,161 @@ class Chamado(db.Model):
                 return BRAZIL_TZ.localize(self.data_conclusao)
         return None
 
+    @property
+    def metadados_extras(self):
+        """Retorna metadados extras como dict"""
+        if self._metadados_extras:
+            try:
+                return json.loads(self._metadados_extras)
+            except:
+                return {}
+        return {}
+
+    @metadados_extras.setter
+    def metadados_extras(self, value):
+        """Define metadados extras a partir de dict"""
+        if value:
+            self._metadados_extras = json.dumps(value)
+        else:
+            self._metadados_extras = None
+
+    def pode_ser_reaberto(self, dias_limite=7):
+        """Verifica se o chamado pode ser reaberto baseado nos critérios"""
+        if self.status not in ['Concluido', 'Cancelado']:
+            return False, "Chamado deve estar concluído ou cancelado"
+
+        if not self.data_conclusao:
+            return False, "Chamado não possui data de conclusão"
+
+        # Verificar se está dentro do prazo
+        from datetime import timedelta
+        prazo_limite = self.data_conclusao + timedelta(days=dias_limite)
+        if get_brazil_time().replace(tzinfo=None) > prazo_limite:
+            return False, f"Prazo de {dias_limite} dias para reabertura expirado"
+
+        return True, "Chamado pode ser reaberto"
+
+    def reabrir_chamado(self, usuario_id, motivo=None):
+        """Reabre o chamado criando um novo registro vinculado"""
+        pode_reabrir, mensagem = self.pode_ser_reaberto()
+        if not pode_reabrir:
+            return None, mensagem
+
+        try:
+            # Criar novo chamado baseado no original
+            novo_chamado = Chamado(
+                codigo=self._gerar_codigo_reabertura(),
+                protocolo=self._gerar_protocolo_reabertura(),
+                solicitante=self.solicitante,
+                cargo=self.cargo,
+                email=self.email,
+                telefone=self.telefone,
+                unidade=self.unidade,
+                problema=self.problema,
+                internet_item=self.internet_item,
+                descricao=f"REABERTURA: {self.descricao}",
+                prioridade=self.prioridade,
+                usuario_id=usuario_id,
+                chamado_origem_id=self.id,
+                reaberto=True,
+                status='Aberto'
+            )
+
+            db.session.add(novo_chamado)
+            db.session.flush()  # Para obter o ID
+
+            # Criar registro de reabertura
+            reabertura = ChamadoReabertura(
+                chamado_original_id=self.id,
+                chamado_reaberto_id=novo_chamado.id,
+                usuario_id=usuario_id,
+                motivo=motivo,
+                problema_similar=self.problema
+            )
+            reabertura.calcular_dias_entre_chamados()
+
+            # Atualizar contador de reaberturas no chamado original
+            self.numero_reaberturas = (self.numero_reaberturas or 0) + 1
+
+            db.session.add(reabertura)
+            db.session.commit()
+
+            return novo_chamado, "Chamado reaberto com sucesso"
+
+        except Exception as e:
+            db.session.rollback()
+            return None, f"Erro ao reabrir chamado: {str(e)}"
+
+    def _gerar_codigo_reabertura(self):
+        """Gera código para chamado reaberto"""
+        import random
+        import string
+        return f"R{self.codigo[1:]}-{''.join(random.choices(string.digits, k=2))}"
+
+    def _gerar_protocolo_reabertura(self):
+        """Gera protocolo para chamado reaberto"""
+        import random
+        import string
+        return f"R{self.protocolo[1:]}-{''.join(random.choices(string.digits, k=2))}"
+
+    def transferir_para_agente(self, agente_id, usuario_transferencia_id, motivo=None, observacoes=None):
+        """Transfere o chamado para outro agente"""
+        try:
+            agente_atual = self.agente_atual_id
+            agente_novo = agente_id
+
+            # Criar registro de transferência
+            transferencia = TransferenciaHistorico(
+                chamado_id=self.id,
+                agente_anterior_id=agente_atual,
+                agente_novo_id=agente_novo,
+                usuario_transferencia_id=usuario_transferencia_id,
+                motivo_transferencia=motivo,
+                observacoes=observacoes,
+                status_anterior=self.status,
+                status_novo=self.status,  # Mantém o mesmo status
+                prioridade_anterior=self.prioridade,
+                prioridade_nova=self.prioridade,  # Mantém a mesma prioridade
+                tipo_transferencia='manual'
+            )
+
+            # Atualizar chamado
+            self.agente_atual_id = agente_novo
+            self.transferido = True
+            self.numero_transferencias = (self.numero_transferencias or 0) + 1
+            self.data_ultima_transferencia = get_brazil_time().replace(tzinfo=None)
+
+            db.session.add(transferencia)
+            db.session.commit()
+
+            return transferencia, "Chamado transferido com sucesso"
+
+        except Exception as e:
+            db.session.rollback()
+            return None, f"Erro ao transferir chamado: {str(e)}"
+
+    def get_historico_transferencias(self):
+        """Retorna histórico de transferências do chamado"""
+        return TransferenciaHistorico.query.filter_by(
+            chamado_id=self.id
+        ).order_by(TransferenciaHistorico.data_transferencia.desc()).all()
+
+    def get_reaberturas(self):
+        """Retorna todas as reaberturas deste chamado"""
+        return ChamadoReabertura.query.filter_by(
+            chamado_original_id=self.id
+        ).order_by(ChamadoReabertura.data_reabertura.desc()).all()
+
+    def eh_reabertura(self):
+        """Verifica se este chamado é uma reabertura"""
+        return self.reaberto and self.chamado_origem_id is not None
+
+    def get_chamado_original(self):
+        """Retorna o chamado original se este for uma reabertura"""
+        if self.eh_reabertura():
+            return Chamado.query.get(self.chamado_origem_id)
+        return None
+
     def __repr__(self):
         return (
             f'<Chamado {self.codigo} | Protocolo: {self.protocolo} | '
@@ -851,7 +1006,7 @@ class SessaoAtiva(db.Model):
     ultima_atividade = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
     ativo = db.Column(db.Boolean, default=True)
 
-    # Informações de localização
+    # Informaç��es de localização
     pais = db.Column(db.String(100), nullable=True)
     cidade = db.Column(db.String(100), nullable=True)
     navegador = db.Column(db.String(100), nullable=True)
