@@ -2601,6 +2601,7 @@ a:focus-visible {
   border-right: 1px solid var(--border-color);
 }
 
+
 [data-theme="dark"] .main-content,
 [data-theme="light"] .main-content {
   background-color: var(--bg-primary);
