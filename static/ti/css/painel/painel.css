@@ -1221,68 +1221,32 @@ select option:checked {
 
 /* ============ SEÇÃO: TABELAS ============ */
 .table-responsive {
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border-color);
-  backdrop-filter: blur(10px);
-  margin: 1rem 0;
-}
-
-@media (max-width: 768px) {
-  .table-responsive {
-    border-radius: 8px;
-    margin: 0.75rem 0;
-  }
 }
 
 .table {
   margin: 0;
   background: var(--card-bg);
   color: var(--light-color);
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-@media (max-width: 768px) {
-  .table {
-    font-size: 0.8125rem;
-  }
+  font-size: var(--font-size-small);
 }
 
 .table thead th {
-  background: linear-gradient(135deg, rgba(255, 98, 0, 0.12), rgba(255, 145, 77, 0.08));
-  border-bottom: 2px solid var(--primary-color);
+  background: rgba(255, 98, 0, 0.1);
+  border-bottom: 1px solid var(--primary-color);
   color: var(--primary-color);
-  font-weight: 700;
-  padding: 1rem 0.75rem;
+  font-weight: 600;
+  padding: var(--spacing-sm);
   border: none;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-size: 0.75rem;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-@media (max-width: 768px) {
-  .table thead th {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.6875rem;
-  }
 }
 
 .table tbody td {
-  padding: 1rem 0.75rem;
+  padding: var(--spacing-sm);
   border-color: var(--border-color);
   vertical-align: middle;
-  transition: all 0.2s ease;
-}
-
-@media (max-width: 768px) {
-  .table tbody td {
-    padding: 0.75rem 0.5rem;
-  }
 }
 
 .table-striped tbody tr:nth-of-type(odd) {
@@ -1290,10 +1254,8 @@ select option:checked {
 }
 
 .table-hover tbody tr:hover {
-  background: linear-gradient(135deg, rgba(255, 98, 0, 0.12), rgba(255, 145, 77, 0.08));
-  transition: all 0.25s ease;
-  transform: scale(1.01);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 98, 0, 0.1);
+  transition: all var(--transition-speed) ease;
 }
 
 /* ============ SEÇÃO: MODAIS ============ */
