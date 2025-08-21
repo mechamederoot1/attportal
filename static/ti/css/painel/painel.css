@@ -407,54 +407,29 @@ a {
 /* ============ SEÇÃO: CONTEÚDO PRINCIPAL ============ */
 .main-content {
   margin-left: var(--sidebar-width);
-  padding: 1.5rem;
+  padding: var(--spacing-lg);
   flex-grow: 1;
   min-height: 100vh;
   transition: margin-left var(--transition-speed) ease;
   margin-top: var(--navbar-height);
   background: linear-gradient(135deg, var(--dark-color) 0%, var(--secondary-color) 100%);
-  position: relative;
-  overflow-x: hidden;
 }
 
 .sidebar.collapsed ~ .main-content {
   margin-left: var(--sidebar-collapsed-width);
 }
 
-/* Improved responsive spacing */
-@media (max-width: 768px) {
-  .main-content {
-    margin-left: 0;
-    padding: 1rem;
-  }
-}
-
-@media (min-width: 1200px) {
-  .main-content {
-    padding: 2rem;
-  }
-}
-
 .content-section {
   display: none;
-  animation: fadeInUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  margin-bottom: 1.5rem;
-  padding: 2rem;
+  animation: fadeInUp 0.4s ease;
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-lg);
   background: var(--card-bg);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border-color);
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(10px);
-}
-
-@media (max-width: 768px) {
-  .content-section {
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    border-radius: 10px;
-  }
 }
 
 .content-section::before {
@@ -478,14 +453,11 @@ a {
 
 h2 {
   color: var(--primary-color);
-  margin-bottom: 2rem;
+  margin-bottom: var(--spacing-lg);
   font-weight: 600;
-  font-size: 1.5rem;
+  font-size: 18px;
   position: relative;
-  padding-bottom: 0.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  padding-bottom: var(--spacing-sm);
 }
 
 h2::after {
@@ -493,22 +465,10 @@ h2::after {
   position: absolute;
   bottom: 0;
   left: 0;
-  width: 60px;
-  height: 3px;
-  background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
-  border-radius: 2px;
-}
-
-@media (max-width: 768px) {
-  h2 {
-    font-size: 1.25rem;
-    margin-bottom: 1.5rem;
-  }
-
-  h2::after {
-    width: 50px;
-    height: 2px;
-  }
+  width: 40px;
+  height: 2px;
+  background: var(--primary-color);
+  border-radius: 1px;
 }
 
 /* ============ SEÇÃO: VISÃO GERAL (CARDS) ============ */
