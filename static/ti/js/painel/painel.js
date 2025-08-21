@@ -398,8 +398,40 @@ const chamadosPerPage = 6;
 let currentPage = 1;
 let currentFilter = 'all';
 
-const chamadosGrid = document.getElementById('chamadosGrid');
-const pagination = document.getElementById('pagination');
+// Function to safely get DOM elements
+function getChamadosGrid() {
+    return document.getElementById('chamadosGrid');
+}
+
+function getPagination() {
+    return document.getElementById('pagination');
+}
+
+// Section content loading function
+function loadSectionContent(sectionId) {
+    console.log(`📂 Carregando conteúdo da seção: ${sectionId}`);
+
+    switch(sectionId) {
+        case 'visao-geral':
+            // Load overview stats
+            atualizarContadoresVisaoGeral();
+            break;
+        case 'gerenciar-chamados':
+            // Load chamados if not already loaded
+            if (!chamadosData || chamadosData.length === 0) {
+                loadChamados();
+            } else {
+                renderChamadosPage(currentPage);
+            }
+            break;
+        case 'sla-dashboard':
+            // Load SLA metrics if needed
+            console.log('Carregando dashboard SLA...');
+            break;
+        default:
+            console.log(`Seção ${sectionId} não requer carregamento específico`);
+    }
+}
 
 // Fun��ão para carregar os chamados da API
 async function loadChamados() {
@@ -1830,7 +1862,7 @@ function abrirModalEditarUsuario(usuarioId) {
     if (!usuario) {
         console.error('Usuário não encontrado:', usuarioId);
         if (window.advancedNotificationSystem) {
-            window.advancedNotificationSystem.showError('Erro', 'Usuário não encontrado para edição');
+            window.advancedNotificationSystem.showError('Erro', 'Usuário não encontrado para ediç��o');
         }
         return;
     }
@@ -2399,7 +2431,7 @@ function inicializarSistemaPainel() {
                     navLink.classList.add('active');
                     console.log('Link de navegação ativado');
                 } else {
-                    console.warn('Link de navegação não encontrado para:', sectionId);
+                    console.warn('Link de navegaç��o não encontrado para:', sectionId);
                 }
 
                 console.log('Navegação concluída com sucesso');
@@ -3267,7 +3299,7 @@ function renderizarGrupos() {
             </div>
             <div class="card-body">
                 <div class="info-row">
-                    <strong>Descrição:</strong>
+                    <strong>Descri��ão:</strong>
                     <span>${grupo.descricao || 'Sem descrição'}</span>
                 </div>
                 <div class="info-row">
@@ -4670,7 +4702,7 @@ async function carregarMonitoramentoCatraca() {
             acessos_hoje: 245,
             acessos_semana: 1680,
             alertas: [
-                { id: 1, tipo: 'warning', mensagem: 'Catraca 3 com lentidão', timestamp: '10:30' },
+                { id: 1, tipo: 'warning', mensagem: 'Catraca 3 com lentid��o', timestamp: '10:30' },
                 { id: 2, tipo: 'info', mensagem: 'Manutenção programada às 18h', timestamp: '09:15' }
             ]
         };
