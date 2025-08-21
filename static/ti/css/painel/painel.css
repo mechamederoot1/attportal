@@ -95,7 +95,7 @@ a {
   transition: all var(--transition-speed) ease;
 }
 
-/* ============ SE����ÃO: SIDEBAR ============ */
+/* ============ SE��ÃO: SIDEBAR ============ */
 .sidebar {
   position: fixed;
   top: 0;
@@ -562,10 +562,9 @@ h2::after {
 }
 
 .chamado-card .card-header, .usuario-card .card-header {
-  padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(255, 98, 0, 0.08), rgba(255, 145, 77, 0.04));
+  padding: var(--spacing-md);
+  background: rgba(255, 98, 0, 0.05);
   border-bottom: 1px solid var(--border-color);
-  position: relative;
 }
 
 .chamado-card .card-header h3, .usuario-card .card-header h3 {
@@ -579,27 +578,19 @@ h2::after {
 }
 
 .chamado-card .card-body, .usuario-card .card-body {
-  padding: 1.25rem;
+  padding: var(--spacing-md);
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-small);
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.info-row:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+  gap: var(--spacing-sm);
 }
 
 .info-row strong {
@@ -617,24 +608,18 @@ h2::after {
 }
 
 .chamado-card .card-footer, .usuario-card .card-footer {
-  padding: 1.25rem;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.02);
   border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--spacing-sm);
 }
 
 .btn-group {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--spacing-xs);
   flex-wrap: wrap;
-}
-
-@media (max-width: 480px) {
-  .btn-group {
-    flex-direction: column;
-  }
 }
 
 .chamado-card .card-footer button, .usuario-card .card-footer button {
