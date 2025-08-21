@@ -1152,3 +1152,304 @@ def obter_agentes_disponiveis():
             'status': 'error',
             'message': f'Erro interno: {str(e)}'
         }), 500
+
+@ti_bp.route('/api/historico/chamados', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_historico_chamados():
+    """Obtém histórico de chamados com filtros e paginação"""
+    try:
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return jsonify({
+                'status': 'error',
+                'message': 'Sem permissão para visualizar histórico'
+            }), 403
+
+        # Parâmetros de paginação
+        pagina = int(request.args.get('pagina', 1))
+        itens_por_pagina = int(request.args.get('itens_por_pagina', 20))
+
+        # Filtros
+        filtros = {
+            'solicitante': request.args.get('solicitante', ''),
+            'problema': request.args.get('problema', ''),
+            'status': request.args.get('status', ''),
+            'reaberto': request.args.get('reaberto', ''),
+            'data_inicio': request.args.get('data_inicio', ''),
+            'data_fim': request.args.get('data_fim', ''),
+            'unidade': request.args.get('unidade', '')
+        }
+
+        # Query base
+        query = Chamado.query
+
+        # Aplicar filtros
+        if filtros['solicitante']:
+            query = query.filter(Chamado.solicitante.contains(filtros['solicitante']))
+
+        if filtros['problema']:
+            query = query.filter(Chamado.problema.contains(filtros['problema']))
+
+        if filtros['status']:
+            query = query.filter(Chamado.status == filtros['status'])
+
+        if filtros['reaberto']:
+            reaberto_bool = filtros['reaberto'].lower() == 'true'
+            query = query.filter(Chamado.reaberto == reaberto_bool)
+
+        if filtros['unidade']:
+            query = query.filter(Chamado.unidade.contains(filtros['unidade']))
+
+        if filtros['data_inicio']:
+            try:
+                data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d')
+                query = query.filter(Chamado.data_abertura >= data_inicio)
+            except ValueError:
+                pass
+
+        if filtros['data_fim']:
+            try:
+                data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d')
+                # Adicionar 1 dia para incluir todo o dia final
+                data_fim = data_fim.replace(hour=23, minute=59, second=59)
+                query = query.filter(Chamado.data_abertura <= data_fim)
+            except ValueError:
+                pass
+
+        # Contagem total
+        total = query.count()
+
+        # Paginação
+        offset = (pagina - 1) * itens_por_pagina
+        chamados = query.order_by(Chamado.data_abertura.desc()).offset(offset).limit(itens_por_pagina).all()
+
+        # Serializar dados
+        chamados_data = []
+        for chamado in chamados:
+            # Verificar se pode reabrir
+            pode_reabrir = False
+            if chamado.status in ['Concluido', 'Cancelado']:
+                pode_reabrir, _ = chamado.pode_ser_reaberto()
+
+            chamados_data.append({
+                'id': chamado.id,
+                'codigo': chamado.codigo,
+                'protocolo': chamado.protocolo,
+                'solicitante': chamado.solicitante,
+                'problema': chamado.problema,
+                'status': chamado.status,
+                'prioridade': chamado.prioridade,
+                'data_abertura': chamado.data_abertura.isoformat() if chamado.data_abertura else None,
+                'data_conclusao': chamado.data_conclusao.isoformat() if chamado.data_conclusao else None,
+                'reaberto': chamado.reaberto or False,
+                'numero_reaberturas': chamado.numero_reaberturas or 0,
+                'transferido': chamado.transferido or False,
+                'numero_transferencias': chamado.numero_transferencias or 0,
+                'pode_reabrir': pode_reabrir
+            })
+
+        # Estatísticas
+        total_reabertos = Chamado.query.filter(Chamado.reaberto == True).count()
+        total_concluidos = Chamado.query.filter(Chamado.status == 'Concluido').count()
+        total_geral = Chamado.query.count()
+
+        taxa_resolucao = round((total_concluidos / total_geral * 100), 1) if total_geral > 0 else 0
+
+        # Calcular tempo médio (simplificado)
+        tempo_medio = 24  # Placeholder - implementar cálculo real
+
+        estatisticas = {
+            'total': total,
+            'reabertos': total_reabertos,
+            'taxa_resolucao': taxa_resolucao,
+            'tempo_medio': tempo_medio
+        }
+
+        return jsonify({
+            'status': 'success',
+            'chamados': chamados_data,
+            'total': total,
+            'estatisticas': estatisticas,
+            'pagina': pagina,
+            'itens_por_pagina': itens_por_pagina
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter histórico de chamados: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/historico/transferencias', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_historico_transferencias():
+    """Obtém histórico de transferências com filtros e paginação"""
+    try:
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return jsonify({
+                'status': 'error',
+                'message': 'Sem permissão para visualizar histórico'
+            }), 403
+
+        from database import TransferenciaHistorico, AgenteSuporte
+
+        # Parâmetros de paginação
+        pagina = int(request.args.get('pagina', 1))
+        itens_por_pagina = int(request.args.get('itens_por_pagina', 20))
+
+        # Filtros
+        filtros = {
+            'chamado': request.args.get('chamado', ''),
+            'agente_origem': request.args.get('agente_origem', ''),
+            'agente_destino': request.args.get('agente_destino', ''),
+            'tipo': request.args.get('tipo', ''),
+            'data_inicio': request.args.get('data_inicio', ''),
+            'data_fim': request.args.get('data_fim', '')
+        }
+
+        # Query base
+        query = TransferenciaHistorico.query.join(Chamado)
+
+        # Aplicar filtros
+        if filtros['chamado']:
+            query = query.filter(Chamado.codigo.contains(filtros['chamado']))
+
+        if filtros['agente_origem']:
+            query = query.filter(TransferenciaHistorico.agente_anterior_id == filtros['agente_origem'])
+
+        if filtros['agente_destino']:
+            query = query.filter(TransferenciaHistorico.agente_novo_id == filtros['agente_destino'])
+
+        if filtros['tipo']:
+            query = query.filter(TransferenciaHistorico.tipo_transferencia == filtros['tipo'])
+
+        if filtros['data_inicio']:
+            try:
+                data_inicio = datetime.strptime(filtros['data_inicio'], '%Y-%m-%d')
+                query = query.filter(TransferenciaHistorico.data_transferencia >= data_inicio)
+            except ValueError:
+                pass
+
+        if filtros['data_fim']:
+            try:
+                data_fim = datetime.strptime(filtros['data_fim'], '%Y-%m-%d')
+                data_fim = data_fim.replace(hour=23, minute=59, second=59)
+                query = query.filter(TransferenciaHistorico.data_transferencia <= data_fim)
+            except ValueError:
+                pass
+
+        # Contagem total
+        total = query.count()
+
+        # Paginação
+        offset = (pagina - 1) * itens_por_pagina
+        transferencias = query.order_by(TransferenciaHistorico.data_transferencia.desc()).offset(offset).limit(itens_por_pagina).all()
+
+        # Serializar dados
+        transferencias_data = []
+        for transferencia in transferencias:
+            transferencias_data.append({
+                'id': transferencia.id,
+                'data_transferencia': transferencia.data_transferencia.isoformat() if transferencia.data_transferencia else None,
+                'chamado': {
+                    'id': transferencia.chamado.id,
+                    'codigo': transferencia.chamado.codigo,
+                    'solicitante': transferencia.chamado.solicitante,
+                    'problema': transferencia.chamado.problema
+                },
+                'agente_anterior': {
+                    'id': transferencia.agente_anterior.id if transferencia.agente_anterior else None,
+                    'nome': f"{transferencia.agente_anterior.usuario.nome} {transferencia.agente_anterior.usuario.sobrenome}" if transferencia.agente_anterior else None
+                },
+                'agente_novo': {
+                    'id': transferencia.agente_novo.id if transferencia.agente_novo else None,
+                    'nome': f"{transferencia.agente_novo.usuario.nome} {transferencia.agente_novo.usuario.sobrenome}" if transferencia.agente_novo else None
+                },
+                'usuario_transferencia': {
+                    'id': transferencia.usuario_transferencia.id,
+                    'nome': f"{transferencia.usuario_transferencia.nome} {transferencia.usuario_transferencia.sobrenome}"
+                },
+                'tipo_transferencia': transferencia.tipo_transferencia,
+                'motivo_transferencia': transferencia.motivo_transferencia,
+                'observacoes': transferencia.observacoes,
+                'status_anterior': transferencia.status_anterior,
+                'status_novo': transferencia.status_novo,
+                'prioridade_anterior': transferencia.prioridade_anterior,
+                'prioridade_nova': transferencia.prioridade_nova,
+                'tempo_entre_transferencias': transferencia.get_tempo_entre_transferencia(),
+                'metadados': transferencia.metadados
+            })
+
+        # Estatísticas
+        total_hoje = TransferenciaHistorico.query.filter(
+            TransferenciaHistorico.data_transferencia >= datetime.now().date()
+        ).count()
+
+        # Agente mais ativo (simplificado)
+        agente_mais_ativo = "João Silva"  # Placeholder
+
+        estatisticas = {
+            'total': total,
+            'hoje': total_hoje,
+            'agente_mais_ativo': agente_mais_ativo,
+            'tempo_medio': 2  # Placeholder
+        }
+
+        # Dados para gráficos (simplificado)
+        graficos = {
+            'periodo': {
+                'labels': ['01/12', '02/12', '03/12', '04/12', '05/12'],
+                'dados': [2, 5, 3, 8, 4]
+            },
+            'tipos': {
+                'labels': ['Manual', 'Automática', 'Escalação'],
+                'dados': [60, 25, 15]
+            }
+        }
+
+        return jsonify({
+            'status': 'success',
+            'transferencias': transferencias_data,
+            'total': total,
+            'estatisticas': estatisticas,
+            'graficos': graficos,
+            'pagina': pagina,
+            'itens_por_pagina': itens_por_pagina
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter histórico de transferências: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
+
+@ti_bp.route('/api/unidades', methods=['GET'])
+@login_required
+@setor_required('ti')
+def obter_unidades():
+    """Obtém lista de unidades"""
+    try:
+        unidades = Unidade.query.order_by(Unidade.nome).all()
+
+        unidades_data = []
+        for unidade in unidades:
+            unidades_data.append({
+                'id': unidade.id,
+                'nome': unidade.nome
+            })
+
+        return jsonify({
+            'status': 'success',
+            'unidades': unidades_data,
+            'total': len(unidades_data)
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao obter unidades: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': f'Erro interno: {str(e)}'
+        }), 500
