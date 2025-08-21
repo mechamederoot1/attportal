@@ -52,12 +52,33 @@ function initializeSubmenuToggles() {
 let navLinks = null;
 let sections = null;
 
+// Initialize everything when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 DOM carregado - inicializando sistema...');
+
+    // Initialize navigation system
+    initializeNavigation();
+
+    // Initialize submenu toggles
+    initializeSubmenuToggles();
+
+    // Initialize gerenciar-chamados specific listeners
+    setTimeout(() => {
+        initializeGerenciarChamadosListeners();
+    }, 100);
+
+    // Load initial section content
+    loadSectionContent('visao-geral');
+
+    console.log('✅ Sistema inicializado com sucesso');
+});
+
 function initializeNavigation() {
     console.log('=== INICIALIZANDO NAVEGAÇÃO ===');
     console.log('Timestamp:', new Date().toISOString());
 
     // Always re-query the DOM to ensure we have the latest elements
-    navLinks = document.querySelectorAll('.sidebar nav ul li a[href^="#"]');
+    navLinks = document.querySelectorAll('.sidebar nav ul li a[href^="#"]:not([data-status])');
     sections = document.querySelectorAll('section.content-section');
 
     console.log('Links de navegação encontrados:', navLinks.length);
@@ -123,8 +144,8 @@ function initializeNavigation() {
                 return;
             }
 
-            // Remove active class from all navigation links
-            document.querySelectorAll('.sidebar nav ul li a').forEach(l => l.classList.remove('active'));
+            // Remove active class from all navigation links (except data-status ones)
+            document.querySelectorAll('.sidebar nav ul li a:not([data-status])').forEach(l => l.classList.remove('active'));
 
             // Add active class to clicked link
             this.classList.add('active');
@@ -138,6 +159,12 @@ function initializeNavigation() {
                     parentToggle.classList.add('active');
                     parentToggle.setAttribute('aria-expanded', 'true');
                 }
+            }
+
+            // Reset filter for gerenciar-chamados section when accessing directly
+            if (targetId === 'gerenciar-chamados') {
+                currentFilter = 'all';
+                currentPage = 1;
             }
 
             // Activate the target section
@@ -939,44 +966,64 @@ function attachCardEventListeners() {
 function initializeGerenciarChamadosListeners() {
     console.log('🔄 Inicializando listeners do submenu gerenciar-chamados...');
 
-    const submenuLinks = document.querySelectorAll('#submenu-gerenciar-chamados a');
+    const submenuLinks = document.querySelectorAll('#submenu-gerenciar-chamados a[data-status]');
     console.log(`📋 Encontrados ${submenuLinks.length} links no submenu gerenciar-chamados`);
 
     submenuLinks.forEach((link, index) => {
         console.log(`📌 Link ${index}: href="${link.getAttribute('href')}", data-status="${link.getAttribute('data-status')}"`);
 
-        link.addEventListener('click', function(e) {
+        // Remove any existing event listeners by cloning the element
+        const newLink = link.cloneNode(true);
+        link.parentNode.replaceChild(newLink, link);
+
+        newLink.addEventListener('click', function(e) {
             e.preventDefault();
+            e.stopPropagation();
+
             const status = this.getAttribute('data-status');
             console.log(`🎯 Filtro selecionado: ${status}`);
 
+            // Set the filter and reset page
             currentFilter = status;
             currentPage = 1;
 
-            // Verificar se os dados já foram carregados
-            if (chamadosData && chamadosData.length > 0) {
-                renderChamadosPage(currentPage);
-            } else {
-                console.log('📥 Carregando dados dos chamados...');
-                loadChamados();
-            }
-
+            // Activate the gerenciar-chamados section first
             activateSection('gerenciar-chamados');
 
-            // Atualizar o item ativo no menu
-            document.querySelectorAll('.sidebar a.active').forEach(item => {
+            // Update active menu items
+            document.querySelectorAll('.sidebar a').forEach(item => {
                 item.classList.remove('active');
             });
             this.classList.add('active');
-            const parentSubmenuToggle = this.closest('.submenu').previousElementSibling;
-            if (parentSubmenuToggle) {
-                parentSubmenuToggle.classList.add('active');
+
+            // Ensure parent submenu is open and active
+            const parentLi = this.closest('li.has-submenu');
+            if (parentLi) {
+                parentLi.classList.add('open');
+                const parentToggle = parentLi.querySelector('.submenu-toggle');
+                if (parentToggle) {
+                    parentToggle.classList.add('active');
+                    parentToggle.setAttribute('aria-expanded', 'true');
+                }
+            }
+
+            // Load and render chamados with the filter
+            if (chamadosData && chamadosData.length > 0) {
+                console.log('📊 Renderizando chamados com filtro:', status);
+                renderChamadosPage(currentPage);
+            } else {
+                console.log('📥 Carregando dados dos chamados...');
+                loadChamados().then(() => {
+                    console.log('📊 Dados carregados, renderizando com filtro:', status);
+                    renderChamadosPage(currentPage);
+                });
             }
         });
     });
 
     if (submenuLinks.length === 0) {
-        console.warn('⚠️ Nenhum link encontrado no submenu gerenciar-chamados');
+        console.warn('⚠️ Nenhum link com data-status encontrado no submenu gerenciar-chamados');
+        console.log('🔍 Links disponíveis no submenu:', document.querySelectorAll('#submenu-gerenciar-chamados a'));
     } else {
         console.log('✅ Listeners do submenu gerenciar-chamados inicializados com sucesso');
     }
