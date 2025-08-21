@@ -137,7 +137,23 @@
           </ul>
         </li>
 
-        <li><a href="#historico" tabindex="0"><i class="fas fa-history"></i><span>Histórico</span></a></li>
+        <li class="has-submenu" tabindex="0" aria-haspopup="true" aria-expanded="false">
+          <a href="#" class="submenu-toggle" aria-controls="submenu-historico" aria-expanded="false" tabindex="0">
+            <i class="fas fa-history"></i><span>Histórico</span>
+          </a>
+          <ul class="submenu" id="submenu-historico" aria-label="submenu histórico" role="menu">
+            <li role="none">
+              <a href="#historico-chamados" role="menuitem" tabindex="-1">
+                <i class="fas fa-ticket-alt"></i><span>Histórico de Chamados</span>
+              </a>
+            </li>
+            <li role="none">
+              <a href="#historico-transferencias" role="menuitem" tabindex="-1">
+                <i class="fas fa-exchange-alt"></i><span>Histórico de Transferências</span>
+              </a>
+            </li>
+          </ul>
+        </li>
         <li><a href="#configuracoes" tabindex="0"><i class="fas fa-cog"></i><span>Configurações</span></a></li>
       </ul>
     </nav>
@@ -2763,7 +2779,7 @@
 
 
 
-    // Configurações de notifica��ões - Sistema implementado
+    // Configurações de notifica���ões - Sistema implementado
     let configuracaoNotificacoes = {
         email_novo_chamado: true,
         email_status_mudou: true,
@@ -3746,7 +3762,7 @@ async function debugChamados() {
 function testarIntegracaoSLA() {
     console.log('=== TESTE DE INTEGRAÇÃO SLA ===');
 
-    // Testar se as configurações atuais estão corretas
+    // Testar se as configuraç��es atuais estão corretas
     const configAtual = {
         primeira_resposta: document.getElementById('slaFirstResponse').value,
         resolucao_critica: document.getElementById('slaCritica').value,
