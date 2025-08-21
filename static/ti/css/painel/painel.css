@@ -624,43 +624,24 @@ h2::after {
 
 .chamado-card .card-footer button, .usuario-card .card-footer button {
   flex: 1;
-  padding: 0.6rem 0.75rem;
-  border-radius: 8px;
+  padding: var(--spacing-xs);
+  border-radius: 6px;
   border: none;
   color: white;
-  font-weight: 600;
-  font-size: 0.75rem;
+  font-weight: 500;
+  font-size: 11px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--transition-speed) ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
-  min-height: 36px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  position: relative;
-  overflow: hidden;
-}
-
-.chamado-card .card-footer button::before, .usuario-card .card-footer button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.chamado-card .card-footer button:hover::before, .usuario-card .card-footer button:hover::before {
-  left: 100%;
+  gap: var(--spacing-xs);
+  min-height: 32px;
 }
 
 .chamado-card .card-footer button:hover, .usuario-card .card-footer button:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 /* Estilos específicos para cards de usuários bloqueados */
