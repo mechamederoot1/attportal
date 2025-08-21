@@ -374,7 +374,7 @@ window.testNavigationTo = function(sectionId) {
     // Atualizar hash
     window.location.hash = sectionId;
 
-    console.log('Teste de navegação concluído');
+    console.log('Teste de navegaç��o concluído');
     return true;
 };
 
@@ -735,8 +735,16 @@ async function updateChamadoStatus(chamadoId, novoStatus) {
     }
 }
 
-// Função para renderizar a p��gina de chamados
+// Função para renderizar a página de chamados
 function renderChamadosPage(page) {
+    const chamadosGrid = getChamadosGrid();
+    const pagination = getPagination();
+
+    if (!chamadosGrid || !pagination) {
+        console.error('Elementos da grid de chamados não encontrados');
+        return;
+    }
+
     chamadosGrid.innerHTML = '';
     const start = (page - 1) * chamadosPerPage;
     const end = start + chamadosPerPage;
