@@ -303,9 +303,23 @@ class HistoricoCompletoManager {
 
         const modal = this.criarModalDetalhes(chamado);
         document.body.appendChild(modal);
-        
+
         const bsModal = new bootstrap.Modal(modal);
         bsModal.show();
+
+        // Ações dentro do modal de detalhes
+        const btnTl = modal.querySelector(`#btnVerTimeline-${chamado.id}`);
+        if (btnTl) {
+            btnTl.addEventListener('click', () => {
+                this.mostrarTimelineChamado(chamado.id);
+            });
+        }
+        const btnAx = modal.querySelector(`#btnVerAnexos-${chamado.id}`);
+        if (btnAx) {
+            btnAx.addEventListener('click', () => {
+                this.mostrarAnexosChamado(chamado.id);
+            });
+        }
 
         // Limpar modal após fechar
         modal.addEventListener('hidden.bs.modal', () => {
