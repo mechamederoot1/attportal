@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, jsonify, current_app, flash, redirect, url_for
 from flask_login import LoginManager, login_required, current_user
 from auth.auth_helpers import setor_required
-from database import db, Chamado, User, Unidade, ProblemaReportado, ItemInternet, seed_unidades, get_brazil_time
+from database import db, Chamado, User, Unidade, ProblemaReportado, ItemInternet, ChamadoAnexo, seed_unidades, get_brazil_time
 import requests
 from msal import ConfidentialClientApplication
 
