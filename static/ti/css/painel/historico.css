@@ -14,8 +14,10 @@
 #historico-chamados .badge.bg-secondary { background-color: var(--bg-tertiary) !important; color: var(--text-primary); }
 
 /* Texto dos cards */
+#historico-chamados .card-title { color: var(--text-primary); font-weight: 600; }
+#historico-chamados small.text-muted { color: var(--text-light) !important; }
 #historico-chamados .problem-text { color: var(--text-primary); }
-#historico-chamados .description-text { color: var(--text-light); }
+#historico-chamados .description-text { color: var(--text-light); line-height: 1.5; }
 
 /* Modal Bootstrap dentro do histórico */
 #historico-chamados .modal-content { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); }
