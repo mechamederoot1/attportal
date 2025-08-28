@@ -1396,10 +1396,11 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
 
         # Registrar no histórico do chamado
         try:
+            anexos_enviados = f". Anexos enviados: {len(anexos_chamado)}" if anexos_chamado else ""
             historico = HistoricoTicket(
                 chamado_id=chamado.id,
                 acao='Ticket enviado',
-                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}',
+                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}{anexos_enviados}',
                 usuario_responsavel=f"{current_user.nome} {current_user.sobrenome}",
                 data_acao=get_brazil_time().replace(tzinfo=None)
             )
@@ -1409,11 +1410,12 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
             logger.warning(f"Erro ao registrar histórico: {str(hist_error)}")
 
         # Registrar log da ação
+        anexos_detalhes = f". Anexos: {len(anexos_chamado)}" if anexos_chamado else ""
         registrar_log_acao(
             usuario_id=current_user.id,
             acao=f'Ticket enviado para chamado {chamado.codigo}',
             categoria='chamados',
-            detalhes=f'Assunto: {assunto}. Destinatários: {", ".join(destinatarios)}',
+            detalhes=f'Assunto: {assunto}. Destinatários: {", ".join(destinatarios)}{anexos_detalhes}',
             recurso_afetado=str(chamado.id),
             tipo_recurso='chamado',
             ip_address=request.remote_addr,
@@ -3516,7 +3518,7 @@ Suporte Evoque.
             return error_response('Falha ao enviar e-mail')
             
     except Exception as e:
-        logger.error(f"Erro ao enviar notificação: {str(e)}")
+        logger.error(f"Erro ao enviar notifica��ão: {str(e)}")
         logger.error(traceback.format_exc())
         return error_response('Erro interno ao enviar notificação')
 
@@ -4827,7 +4829,7 @@ def listar_categorias_logs_acoes():
 @login_required
 @setor_required('Administrador')
 def estatisticas_logs_acoes():
-    """Retorna estatísticas dos logs de ações"""
+    """Retorna estat��sticas dos logs de ações"""
     try:
         from database import LogAcao
 
