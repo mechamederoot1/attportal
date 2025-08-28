@@ -520,6 +520,123 @@ def criar_estrutura():
         <p><a href="/verificar-banco">← Voltar</a></p>
         """
 
+@app.route('/migrar-ticket-anexos')
+@login_required
+def migrar_ticket_anexos():
+    """Endpoint para criar tabela de anexos de tickets"""
+    if not current_user.nivel_acesso == 'Administrador':
+        return "Acesso negado", 403
+
+    try:
+        resultado = []
+        resultado.append("🔧 Executando migração da tabela ticket_anexos...")
+
+        # SQL para criar a tabela ticket_anexos
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS ticket_anexos (
+            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            chamado_id INTEGER NOT NULL,
+            nome_original VARCHAR(255) NOT NULL,
+            nome_arquivo VARCHAR(255) NOT NULL,
+            caminho_arquivo VARCHAR(500) NOT NULL,
+            tamanho_bytes BIGINT NOT NULL,
+            tipo_mime VARCHAR(100) NOT NULL,
+            extensao VARCHAR(10) NOT NULL,
+            hash_arquivo VARCHAR(64),
+            data_upload DATETIME NOT NULL,
+            usuario_upload_id INTEGER NOT NULL,
+            descricao TEXT,
+            ativo BOOLEAN DEFAULT TRUE,
+            origem VARCHAR(50) DEFAULT 'painel',
+
+            FOREIGN KEY (chamado_id) REFERENCES chamado(id),
+            FOREIGN KEY (usuario_upload_id) REFERENCES user(id),
+
+            INDEX idx_chamado_ticket_anexos (chamado_id),
+            INDEX idx_usuario_ticket_anexos (usuario_upload_id),
+            INDEX idx_data_upload_ticket_anexos (data_upload),
+            INDEX idx_origem_ticket_anexos (origem)
+        );
+        """
+
+        # Executar SQL usando SQLAlchemy 2.0 syntax
+        from sqlalchemy import text
+        with db.engine.connect() as conn:
+            conn.execute(text(create_table_sql))
+            conn.commit()
+        resultado.append("✅ Tabela 'ticket_anexos' criada com sucesso!")
+
+        # Verificar se a tabela foi criada
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        tabelas = inspector.get_table_names()
+
+        if 'ticket_anexos' in tabelas:
+            resultado.append("✅ Tabela 'ticket_anexos' confirmada no banco de dados")
+
+            # Obter informações das colunas
+            colunas = inspector.get_columns('ticket_anexos')
+            resultado.append(f"✅ Tabela criada com {len(colunas)} colunas:")
+            for coluna in colunas:
+                resultado.append(f"   - {coluna['name']} ({coluna['type']})")
+
+        # Adicionar configurações padrão para anexos
+        import json
+        from database import Configuracao
+
+        config_anexos = {
+            'ativo': True,
+            'max_file_size_mb': 10,
+            'max_total_size_mb': 50,
+            'allowed_extensions': ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt'],
+            'auto_compress_images': True,
+            'require_description': False,
+            'notify_on_upload': True
+        }
+
+        # Verificar se configuração já existe
+        config_existente = Configuracao.query.filter_by(chave='ticket_anexos').first()
+        if not config_existente:
+            config = Configuracao(
+                chave='ticket_anexos',
+                valor=json.dumps(config_anexos)
+            )
+            db.session.add(config)
+            db.session.commit()
+            resultado.append("✅ Configurações de anexos adicionadas")
+        else:
+            resultado.append("ℹ️ Configurações de anexos já existem")
+
+        resultado.append("🎉 Migração concluída com sucesso!")
+        resultado.append("A funcionalidade de anexos de tickets está pronta para uso.")
+
+        return f"""
+        <h1>🔧 Migração de Anexos de Tickets</h1>
+        <ul>
+        {"".join([f"<li>{r}</li>" for r in resultado])}
+        </ul>
+        <div style="margin-top: 20px; padding: 15px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px;">
+            <h3>✅ Funcionalidade Ativada!</h3>
+            <p>Agora você pode:</p>
+            <ul>
+                <li>📎 Enviar anexos através do painel de tickets</li>
+                <li>🗂️ Arrastar e soltar arquivos</li>
+                <li>📊 Visualizar estatísticas de anexos</li>
+                <li>🔍 Gerenciar arquivos por chamado</li>
+            </ul>
+        </div>
+        <p><a href="/verificar-banco">🔍 Verificar Estrutura do Banco</a></p>
+        <p><a href="/">← Voltar ao Sistema</a></p>
+        """
+
+    except Exception as e:
+        db.session.rollback()
+        return f"""
+        <h1>❌ Erro na Migração</h1>
+        <p>Erro: {str(e)}</p>
+        <p><a href="/verificar-banco">← Voltar</a></p>
+        """
+
 if __name__ == '__main__':
     print("🚀 Iniciando aplicação com proteções de segurança ativas...")
     print("🔌 Socket.IO configurado e ativo")

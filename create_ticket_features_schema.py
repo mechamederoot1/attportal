@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Migração do banco de dados para adicionar funcionalidades de reabertura de chamados e histórico de transferências.
+Migração do banco de dados para adicionar funcionalidades de reabertura de chamados, histórico de transferências e anexos de tickets.
 
 Este script adiciona as seguintes tabelas e colunas:
 1. ChamadoReabertura - Para controlar reaberturas de chamados
 2. TransferenciaHistorico - Para histórico detalhado de transferências
-3. Novas colunas para suporte às funcionalidades
+3. TicketAnexos - Para anexos enviados via painel
+4. Novas colunas para suporte às funcionalidades
 
 Execute este script após backup do banco de dados.
 """
@@ -45,12 +46,54 @@ def criar_tabela_chamado_reabertura():
         );
         """
         
-        db.engine.execute(text(create_table_sql))
+        with db.engine.connect() as conn:
+            conn.execute(text(create_table_sql))
+            conn.commit()
         print("✅ Tabela 'chamado_reabertura' criada com sucesso")
         return True
-        
+
     except Exception as e:
         print(f"❌ Erro ao criar tabela 'chamado_reabertura': {str(e)}")
+        return False
+
+def criar_tabela_ticket_anexos():
+    """Cria tabela para anexos de tickets enviados pelo painel"""
+    try:
+        create_table_sql = """
+        CREATE TABLE IF NOT EXISTS ticket_anexos (
+            id INTEGER PRIMARY KEY AUTO_INCREMENT,
+            chamado_id INTEGER NOT NULL,
+            nome_original VARCHAR(255) NOT NULL,
+            nome_arquivo VARCHAR(255) NOT NULL,
+            caminho_arquivo VARCHAR(500) NOT NULL,
+            tamanho_bytes BIGINT NOT NULL,
+            tipo_mime VARCHAR(100) NOT NULL,
+            extensao VARCHAR(10) NOT NULL,
+            hash_arquivo VARCHAR(64),
+            data_upload DATETIME NOT NULL,
+            usuario_upload_id INTEGER NOT NULL,
+            descricao TEXT,
+            ativo BOOLEAN DEFAULT TRUE,
+            origem VARCHAR(50) DEFAULT 'painel',
+            
+            FOREIGN KEY (chamado_id) REFERENCES chamado(id),
+            FOREIGN KEY (usuario_upload_id) REFERENCES user(id),
+            
+            INDEX idx_chamado_ticket_anexos (chamado_id),
+            INDEX idx_usuario_ticket_anexos (usuario_upload_id),
+            INDEX idx_data_upload_ticket_anexos (data_upload),
+            INDEX idx_origem_ticket_anexos (origem)
+        );
+        """
+        
+        with db.engine.connect() as conn:
+            conn.execute(text(create_table_sql))
+            conn.commit()
+        print("✅ Tabela 'ticket_anexos' criada com sucesso")
+        return True
+
+    except Exception as e:
+        print(f"❌ Erro ao criar tabela 'ticket_anexos': {str(e)}")
         return False
 
 def criar_tabela_transferencia_historico():
@@ -181,6 +224,48 @@ def criar_indexes_performance():
         print(f"❌ Erro ao criar índices: {str(e)}")
         return False
 
+def adicionar_configuracoes_anexos():
+    """Adiciona configurações para anexos de tickets"""
+    try:
+        from database import Configuracao
+        
+        configuracoes_anexos = {
+            'ticket_anexos': {
+                'ativo': True,
+                'max_file_size_mb': 10,
+                'max_total_size_mb': 50,
+                'allowed_extensions': ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'txt'],
+                'auto_compress_images': True,
+                'require_description': False,
+                'notify_on_upload': True
+            },
+            'painel_tickets': {
+                'allow_attachments': True,
+                'max_attachments_per_ticket': 5,
+                'attachment_preview': True,
+                'auto_save_draft': True,
+                'require_subject': True
+            }
+        }
+        
+        for chave, valor in configuracoes_anexos.items():
+            config_existente = Configuracao.query.filter_by(chave=chave).first()
+            if not config_existente:
+                config = Configuracao(
+                    chave=chave,
+                    valor=json.dumps(valor)
+                )
+                db.session.add(config)
+                print(f"✅ Configuração de anexos '{chave}' adicionada")
+        
+        db.session.commit()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erro ao inserir configurações de anexos: {str(e)}")
+        db.session.rollback()
+        return False
+
 def inserir_configuracoes_padrao():
     """Insere configurações padrão para as novas funcionalidades"""
     try:
@@ -248,6 +333,9 @@ def executar_migracao():
         
     if not criar_tabela_transferencia_historico():
         sucesso = False
+        
+    if not criar_tabela_ticket_anexos():
+        sucesso = False
     
     # 2. Adicionar colunas
     if not adicionar_colunas_chamado():
@@ -260,15 +348,20 @@ def executar_migracao():
     # 4. Inserir configurações
     if not inserir_configuracoes_padrao():
         sucesso = False
+        
+    if not adicionar_configuracoes_anexos():
+        sucesso = False
     
     print("=" * 60)
     if sucesso:
         print("✅ Migração concluída com sucesso!")
         print("\nNovas funcionalidades disponíveis:")
-        print("  - Reabertura autom��tica de chamados")
+        print("  - Reabertura automática de chamados")
         print("  - Histórico detalhado de transferências")
         print("  - Métricas aprimoradas")
         print("  - Notificações de transferências")
+        print("  - Envio de anexos através do painel")
+        print("  - Gerenciamento de tickets com anexos")
     else:
         print("❌ Migração concluída com alguns erros.")
         print("Verifique os logs acima para detalhes.")

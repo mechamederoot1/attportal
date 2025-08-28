@@ -515,6 +515,128 @@ class ChamadoAnexo(db.Model):
             'is_document': self.is_document()
         }
 
+class TicketAnexos(db.Model):
+    """Tabela para armazenar anexos de tickets enviados pelo painel"""
+    __tablename__ = 'ticket_anexos'
+
+    id = db.Column(db.Integer, primary_key=True)
+    chamado_id = db.Column(db.Integer, db.ForeignKey('chamado.id'), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=False)
+    nome_arquivo = db.Column(db.String(255), nullable=False)  # Nome único no sistema
+    caminho_arquivo = db.Column(db.String(500), nullable=False)
+    tamanho_bytes = db.Column(db.BigInteger, nullable=False)
+    tipo_mime = db.Column(db.String(100), nullable=False)
+    extensao = db.Column(db.String(10), nullable=False)
+    hash_arquivo = db.Column(db.String(64), nullable=True)  # SHA-256 para verificação
+    data_upload = db.Column(db.DateTime, default=lambda: get_brazil_time().replace(tzinfo=None))
+    usuario_upload_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    descricao = db.Column(db.Text, nullable=True)  # Descrição opcional do anexo
+    ativo = db.Column(db.Boolean, default=True)  # Para soft delete
+    origem = db.Column(db.String(50), default='painel')  # Origem do anexo
+
+    # Relacionamentos
+    chamado = db.relationship('Chamado', backref='ticket_anexos')
+    usuario_upload = db.relationship('User', backref='ticket_anexos_enviados')
+
+    def __repr__(self):
+        return f'<TicketAnexos {self.nome_original} - Chamado {self.chamado_id}>'
+
+    def get_tamanho_formatado(self):
+        """Retorna o tamanho do arquivo em formato legível"""
+        if self.tamanho_bytes < 1024:
+            return f"{self.tamanho_bytes} B"
+        elif self.tamanho_bytes < 1024 * 1024:
+            return f"{self.tamanho_bytes / 1024:.1f} KB"
+        elif self.tamanho_bytes < 1024 * 1024 * 1024:
+            return f"{self.tamanho_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{self.tamanho_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+    def get_data_upload_brazil(self):
+        """Retorna data de upload no timezone do Brasil"""
+        if self.data_upload:
+            if self.data_upload.tzinfo:
+                return self.data_upload.astimezone(BRAZIL_TZ)
+            else:
+                return BRAZIL_TZ.localize(self.data_upload)
+        return None
+
+    def is_image(self):
+        """Verifica se o arquivo é uma imagem"""
+        image_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp']
+        return self.tipo_mime.lower() in image_types
+
+    def is_video(self):
+        """Verifica se o arquivo é um vídeo"""
+        video_types = ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/flv', 'video/webm', 'video/mkv']
+        return self.tipo_mime.lower() in video_types
+
+    def is_document(self):
+        """Verifica se o arquivo é um documento"""
+        document_types = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'text/plain'
+        ]
+        return self.tipo_mime.lower() in document_types
+
+    def get_tipo_arquivo(self):
+        """Retorna o tipo do arquivo de forma amigável"""
+        if self.is_image():
+            return 'Imagem'
+        elif self.is_video():
+            return 'Vídeo'
+        elif self.is_document():
+            return 'Documento'
+        else:
+            return 'Arquivo'
+
+    def get_icone_arquivo(self):
+        """Retorna o ícone FontAwesome apropriado para o tipo de arquivo"""
+        if self.is_image():
+            return 'fas fa-image'
+        elif self.is_video():
+            return 'fas fa-video'
+        elif self.tipo_mime == 'application/pdf':
+            return 'fas fa-file-pdf'
+        elif 'word' in self.tipo_mime or 'document' in self.tipo_mime:
+            return 'fas fa-file-word'
+        elif 'excel' in self.tipo_mime or 'sheet' in self.tipo_mime:
+            return 'fas fa-file-excel'
+        elif 'powerpoint' in self.tipo_mime or 'presentation' in self.tipo_mime:
+            return 'fas fa-file-powerpoint'
+        elif self.tipo_mime == 'text/plain':
+            return 'fas fa-file-alt'
+        else:
+            return 'fas fa-file'
+
+    def to_dict(self):
+        """Converte o anexo para dicionário"""
+        return {
+            'id': self.id,
+            'chamado_id': self.chamado_id,
+            'nome_original': self.nome_original,
+            'nome_arquivo': self.nome_arquivo,
+            'tamanho_bytes': self.tamanho_bytes,
+            'tamanho_formatado': self.get_tamanho_formatado(),
+            'tipo_mime': self.tipo_mime,
+            'extensao': self.extensao,
+            'data_upload': self.get_data_upload_brazil().strftime('%d/%m/%Y %H:%M:%S') if self.data_upload else None,
+            'usuario_upload': f"{self.usuario_upload.nome} {self.usuario_upload.sobrenome}",
+            'descricao': self.descricao,
+            'tipo_arquivo': self.get_tipo_arquivo(),
+            'icone': self.get_icone_arquivo(),
+            'is_image': self.is_image(),
+            'is_video': self.is_video(),
+            'is_document': self.is_document(),
+            'origem': self.origem
+        }
+
 class Unidade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), unique=True, nullable=False)

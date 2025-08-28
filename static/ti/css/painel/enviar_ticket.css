@@ -57,3 +57,184 @@
         opacity: 1;
     }
 }
+
+/* Estilos para anexos de tickets */
+.anexos-section-ticket {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 2px dashed rgba(255, 98, 0, 0.3);
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+}
+
+.anexos-section-ticket.dragover {
+    border-color: #FF6200;
+    background-color: rgba(255, 98, 0, 0.1);
+    transform: scale(1.02);
+}
+
+.upload-area-ticket {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 6px;
+}
+
+.upload-area-ticket:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.upload-icon-ticket {
+    font-size: 2rem;
+    color: #FF6200;
+    margin-bottom: 0.5rem;
+    opacity: 0.8;
+}
+
+.upload-text-ticket {
+    color: #F8F9FA;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.upload-info-ticket {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    line-height: 1.3;
+}
+
+.file-input-ticket {
+    display: none;
+}
+
+.anexos-list-ticket {
+    margin-top: 1rem;
+}
+
+.anexo-item-ticket {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    border-left: 3px solid #FF6200;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.anexo-info-ticket {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.anexo-icon-ticket {
+    font-size: 1.1rem;
+    margin-right: 0.75rem;
+    min-width: 20px;
+}
+
+.anexo-details-ticket {
+    flex: 1;
+}
+
+.anexo-nome-ticket {
+    font-weight: 500;
+    font-size: 0.85rem;
+    color: #F8F9FA;
+    margin-bottom: 0.15rem;
+    word-break: break-word;
+}
+
+.anexo-tamanho-ticket {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.anexo-actions-ticket {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-remove-ticket {
+    background: none;
+    border: none;
+    color: #ff4444;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-remove-ticket:hover {
+    background-color: rgba(255, 68, 68, 0.2);
+    transform: scale(1.1);
+}
+
+.anexos-info-ticket {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+    padding: 0.5rem 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.limite-info-ticket {
+    color: #FF6200;
+    font-weight: 500;
+}
+
+/* Ícones por tipo de arquivo */
+.anexo-icon-ticket.fas.fa-image { color: #4caf50; }
+.anexo-icon-ticket.fas.fa-video { color: #f44336; }
+.anexo-icon-ticket.fas.fa-file-pdf { color: #f44336; }
+.anexo-icon-ticket.fas.fa-file-word { color: #2196f3; }
+.anexo-icon-ticket.fas.fa-file-excel { color: #4caf50; }
+.anexo-icon-ticket.fas.fa-file-powerpoint { color: #ff9800; }
+.anexo-icon-ticket.fas.fa-file-alt { color: #9e9e9e; }
+.anexo-icon-ticket.fas.fa-file { color: #757575; }
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .anexos-section-ticket {
+        padding: 0.75rem;
+    }
+
+    .upload-area-ticket {
+        padding: 1rem 0.5rem;
+    }
+
+    .anexo-item-ticket {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .anexo-actions-ticket {
+        align-self: flex-end;
+    }
+}
