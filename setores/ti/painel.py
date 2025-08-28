@@ -1283,6 +1283,398 @@ def transferir_chamado_agente(chamado_id):
         logger.error(f"Erro ao transferir chamado: {str(e)}")
         return error_response('Erro interno no servidor')
 
+@painel_bp.route('/api/chamados/<int:chamado_id>/ticket', methods=['POST'])
+@api_login_required
+def enviar_ticket_chamado(chamado_id):
+    """Envia ticket/comunicação relacionado a um chamado específico"""
+    try:
+        if not request.is_json:
+            return error_response('Content-Type deve ser application/json', 400)
+
+        data = request.get_json()
+        if not data:
+            return error_response('Dados não fornecidos', 400)
+
+        # Validar dados obrigatórios
+        assunto = data.get('assunto', '').strip()
+        mensagem = data.get('mensagem', '').strip()
+
+        if not assunto or not mensagem:
+            return error_response('Assunto e mensagem são obrigatórios', 400)
+
+        # Verificar se o chamado existe
+        chamado = Chamado.query.get(chamado_id)
+        if not chamado:
+            return error_response('Chamado não encontrado', 404)
+
+        # Verificar permissões - agente atribuído ou administrador
+        agente = AgenteSuporte.query.filter_by(usuario_id=current_user.id, ativo=True).first()
+        if not agente and current_user.nivel_acesso != 'Administrador':
+            return error_response('Usuário não tem permissão para enviar tickets', 403)
+
+        if agente:
+            # Verificar se o chamado está atribu��do ao agente
+            atribuicao = ChamadoAgente.query.filter_by(
+                chamado_id=chamado_id,
+                agente_id=agente.id,
+                ativo=True
+            ).first()
+
+            if not atribuicao and current_user.nivel_acesso != 'Administrador':
+                return error_response('Chamado não está atribuído a você', 403)
+
+        # Extrair outros dados opcionais
+        prioridade_alta = data.get('prioridade', False)
+        enviar_copia = data.get('enviar_copia', False)
+        modelo = data.get('modelo', '')
+
+        # Preparar informações do ticket
+        prioridade_texto = 'ALTA PRIORIDADE' if prioridade_alta else 'Prioridade Normal'
+
+        # Montar o assunto completo
+        assunto_completo = f"[{chamado.codigo}] {assunto}"
+        if prioridade_alta:
+            assunto_completo = f"[PRIORITÁRIO] {assunto_completo}"
+
+        # Montar corpo da mensagem
+        corpo_mensagem = f"""
+{mensagem}
+
+========== DETALHES DO CHAMADO ==========
+Código: {chamado.codigo}
+Protocolo: {chamado.protocolo}
+Solicitante: {chamado.solicitante}
+Problema: {chamado.problema}
+Status Atual: {chamado.status}
+Prioridade: {chamado.prioridade}
+Data de Abertura: {chamado.get_data_abertura_brazil().strftime('%d/%m/%Y %H:%M:%S') if chamado.get_data_abertura_brazil() else 'N/A'}
+
+Enviado por: {current_user.nome} {current_user.sobrenome}
+E-mail: {current_user.email}
+Data/Hora: {get_brazil_time().strftime('%d/%m/%Y %H:%M:%S')}
+
+---
+Sistema de Gerenciamento de Chamados - Evoque Fitness
+"""
+
+        # Preparar lista de destinatários
+        destinatarios = [chamado.email]  # Sempre enviar para o solicitante
+
+        if enviar_copia:
+            # Adicionar e-mail do agente/usuário atual
+            if current_user.email and current_user.email not in destinatarios:
+                destinatarios.append(current_user.email)
+
+            # Adicionar e-mail de TI se disponível
+            email_ti = os.getenv('EMAIL_TI')
+            if email_ti and email_ti not in destinatarios:
+                destinatarios.append(email_ti)
+
+        # Tentar enviar o e-mail
+        try:
+            from setores.ti.routes import enviar_email
+            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios)
+
+            if not sucesso_email:
+                logger.warning(f"Falha ao enviar e-mail do ticket para chamado {chamado.codigo}")
+                return error_response('Falha ao enviar e-mail. Verifique as configurações de e-mail.')
+
+        except Exception as email_error:
+            logger.error(f"Erro ao enviar e-mail do ticket: {str(email_error)}")
+            return error_response('Erro ao enviar e-mail. Tente novamente.')
+
+        # Registrar no histórico do chamado
+        try:
+            historico = HistoricoTicket(
+                chamado_id=chamado.id,
+                acao='Ticket enviado',
+                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}',
+                usuario_responsavel=f"{current_user.nome} {current_user.sobrenome}",
+                data_acao=get_brazil_time().replace(tzinfo=None)
+            )
+            db.session.add(historico)
+            db.session.commit()
+        except Exception as hist_error:
+            logger.warning(f"Erro ao registrar histórico: {str(hist_error)}")
+
+        # Registrar log da ação
+        registrar_log_acao(
+            usuario_id=current_user.id,
+            acao=f'Ticket enviado para chamado {chamado.codigo}',
+            categoria='chamados',
+            detalhes=f'Assunto: {assunto}. Destinatários: {", ".join(destinatarios)}',
+            recurso_afetado=str(chamado.id),
+            tipo_recurso='chamado',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+
+        # Emitir evento Socket.IO para notificação em tempo real
+        try:
+            if hasattr(current_app, 'socketio'):
+                current_app.socketio.emit('ticket_enviado', {
+                    'chamado_id': chamado.id,
+                    'codigo': chamado.codigo,
+                    'assunto': assunto,
+                    'remetente': f"{current_user.nome} {current_user.sobrenome}",
+                    'destinatarios': destinatarios,
+                    'prioridade': prioridade_texto,
+                    'timestamp': get_brazil_time().isoformat()
+                })
+        except Exception as socket_error:
+            logger.warning(f"Erro ao emitir evento Socket.IO: {str(socket_error)}")
+
+        return json_response({
+            'message': 'Ticket enviado com sucesso',
+            'ticket': {
+                'chamado_id': chamado.id,
+                'codigo': chamado.codigo,
+                'assunto': assunto,
+                'destinatarios': destinatarios,
+                'prioridade': prioridade_texto,
+                'data_envio': get_brazil_time().strftime('%d/%m/%Y %H:%M:%S')
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao enviar ticket para chamado {chamado_id}: {str(e)}")
+        return error_response('Erro interno no servidor')
+
+@painel_bp.route('/api/historico/chamados/completo', methods=['GET'])
+@api_login_required
+def historico_chamados_completo():
+    """Retorna histórico completo de chamados com timeline detalhado"""
+    try:
+        # Verificar permissões
+        if not current_user.tem_permissao('Administrador') and not current_user.eh_agente_suporte_ativo():
+            return error_response('Sem permissão para visualizar histórico completo', 403)
+
+        # Parâmetros de paginação e filtros
+        pagina = int(request.args.get('pagina', 1))
+        itens_por_pagina = int(request.args.get('itens_por_pagina', 12))
+
+        # Filtros
+        solicitante = request.args.get('solicitante', '').strip()
+        problema = request.args.get('problema', '').strip()
+        status = request.args.get('status', '').strip()
+        prioridade = request.args.get('prioridade', '').strip()
+        unidade = request.args.get('unidade', '').strip()
+        data_inicio = request.args.get('data_inicio', '').strip()
+        data_fim = request.args.get('data_fim', '').strip()
+
+        # Query base
+        query = Chamado.query
+
+        # Aplicar filtros
+        if solicitante:
+            query = query.filter(Chamado.solicitante.contains(solicitante))
+        if problema:
+            query = query.filter(Chamado.problema.contains(problema))
+        if status:
+            query = query.filter(Chamado.status == status)
+        if prioridade:
+            query = query.filter(Chamado.prioridade == prioridade)
+        if unidade:
+            query = query.filter(Chamado.unidade.contains(unidade))
+
+        # Filtros de data
+        if data_inicio:
+            try:
+                data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+                query = query.filter(Chamado.data_abertura >= data_inicio_dt)
+            except ValueError:
+                pass
+
+        if data_fim:
+            try:
+                data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d') + timedelta(days=1)
+                query = query.filter(Chamado.data_abertura < data_fim_dt)
+            except ValueError:
+                pass
+
+        # Ordenação por data de abertura (mais recentes primeiro)
+        query = query.order_by(Chamado.data_abertura.desc())
+
+        # Paginação
+        paginacao = query.paginate(
+            page=pagina,
+            per_page=itens_por_pagina,
+            error_out=False
+        )
+
+        chamados_data = []
+        for chamado in paginacao.items:
+            # Dados básicos do chamado
+            chamado_info = {
+                'id': chamado.id,
+                'codigo': chamado.codigo,
+                'protocolo': chamado.protocolo,
+                'solicitante': chamado.solicitante,
+                'cargo': chamado.cargo,
+                'email': chamado.email,
+                'telefone': chamado.telefone,
+                'unidade': chamado.unidade,
+                'problema': chamado.problema,
+                'internet_item': chamado.internet_item,
+                'descricao': chamado.descricao,
+                'status': chamado.status,
+                'prioridade': chamado.prioridade,
+                'data_abertura': chamado.data_abertura.strftime('%Y-%m-%d %H:%M:%S') if chamado.data_abertura else None,
+                'data_primeira_resposta': chamado.data_primeira_resposta.strftime('%Y-%m-%d %H:%M:%S') if chamado.data_primeira_resposta else None,
+                'data_conclusao': chamado.data_conclusao.strftime('%Y-%m-%d %H:%M:%S') if chamado.data_conclusao else None,
+                'data_visita': chamado.data_visita.strftime('%Y-%m-%d') if chamado.data_visita else None,
+                'reaberto': chamado.reaberto if hasattr(chamado, 'reaberto') else False,
+                'numero_reaberturas': chamado.numero_reaberturas if hasattr(chamado, 'numero_reaberturas') else 0,
+                'numero_transferencias': chamado.numero_transferencias if hasattr(chamado, 'numero_transferencias') else 0,
+            }
+
+            # Timeline de eventos
+            timeline = []
+
+            # 1. Abertura do chamado
+            if chamado.data_abertura:
+                timeline.append({
+                    'tipo': 'abertura',
+                    'titulo': 'Chamado Aberto',
+                    'descricao': f'Chamado {chamado.codigo} aberto por {chamado.solicitante}',
+                    'data': chamado.data_abertura.strftime('%Y-%m-%d %H:%M:%S'),
+                    'icone': 'fa-plus-circle',
+                    'cor': 'primary',
+                    'detalhes': {
+                        'problema': chamado.problema,
+                        'prioridade': chamado.prioridade,
+                        'unidade': chamado.unidade
+                    }
+                })
+
+            # 2. Primeira resposta
+            if chamado.data_primeira_resposta:
+                timeline.append({
+                    'tipo': 'primeira_resposta',
+                    'titulo': 'Primeira Resposta',
+                    'descricao': 'Primeira resposta dada ao solicitante',
+                    'data': chamado.data_primeira_resposta.strftime('%Y-%m-%d %H:%M:%S'),
+                    'icone': 'fa-reply',
+                    'cor': 'info'
+                })
+
+            # 3. Histórico de status (simulado baseado nos dados disponíveis)
+            status_changes = []
+            if chamado.status == 'Aguardando' and chamado.data_primeira_resposta:
+                status_changes.append({
+                    'tipo': 'status_change',
+                    'titulo': 'Status Alterado',
+                    'descricao': 'Status alterado para "Aguardando"',
+                    'data': chamado.data_primeira_resposta.strftime('%Y-%m-%d %H:%M:%S'),
+                    'icone': 'fa-clock',
+                    'cor': 'warning',
+                    'detalhes': {
+                        'status_anterior': 'Aberto',
+                        'status_novo': 'Aguardando'
+                    }
+                })
+
+            # 4. Buscar histórico de tickets (comunicações)
+            try:
+                historico_tickets = HistoricoTicket.query.filter_by(chamado_id=chamado.id).order_by(HistoricoTicket.data_acao).all()
+                for ticket in historico_tickets:
+                    timeline.append({
+                        'tipo': 'comunicacao',
+                        'titulo': f'Comunicação: {ticket.acao}',
+                        'descricao': ticket.detalhes[:100] + '...' if len(ticket.detalhes) > 100 else ticket.detalhes,
+                        'data': ticket.data_acao.strftime('%Y-%m-%d %H:%M:%S') if ticket.data_acao else None,
+                        'icone': 'fa-envelope',
+                        'cor': 'secondary',
+                        'detalhes': {
+                            'acao_completa': ticket.acao,
+                            'detalhes_completos': ticket.detalhes,
+                            'usuario_responsavel': ticket.usuario_responsavel
+                        }
+                    })
+            except Exception as e:
+                logger.warning(f"Erro ao buscar histórico de tickets para chamado {chamado.id}: {str(e)}")
+
+            # 5. Buscar anexos
+            anexos_info = []
+            try:
+                from database import ChamadoAnexo
+                anexos = ChamadoAnexo.query.filter_by(chamado_id=chamado.id, ativo=True).all()
+                for anexo in anexos:
+                    anexos_info.append({
+                        'id': anexo.id,
+                        'nome_original': anexo.nome_original,
+                        'tamanho_formatado': anexo.get_tamanho_formatado(),
+                        'tipo_arquivo': anexo.get_tipo_arquivo(),
+                        'data_upload': anexo.data_upload.strftime('%Y-%m-%d %H:%M:%S') if anexo.data_upload else None,
+                        'usuario_upload': f"{anexo.usuario_upload.nome} {anexo.usuario_upload.sobrenome}" if anexo.usuario_upload else 'Desconhecido'
+                    })
+
+                    # Adicionar evento de anexo na timeline
+                    timeline.append({
+                        'tipo': 'anexo',
+                        'titulo': 'Anexo Adicionado',
+                        'descricao': f'Arquivo "{anexo.nome_original}" anexado ao chamado',
+                        'data': anexo.data_upload.strftime('%Y-%m-%d %H:%M:%S') if anexo.data_upload else None,
+                        'icone': 'fa-paperclip',
+                        'cor': 'success',
+                        'detalhes': {
+                            'arquivo': anexo.nome_original,
+                            'tamanho': anexo.get_tamanho_formatado(),
+                            'tipo': anexo.get_tipo_arquivo(),
+                            'usuario': f"{anexo.usuario_upload.nome} {anexo.usuario_upload.sobrenome}" if anexo.usuario_upload else 'Desconhecido'
+                        }
+                    })
+            except Exception as e:
+                logger.warning(f"Erro ao buscar anexos para chamado {chamado.id}: {str(e)}")
+
+            # 6. Conclusão do chamado
+            if chamado.data_conclusao:
+                timeline.append({
+                    'tipo': 'conclusao',
+                    'titulo': f'Chamado {chamado.status}',
+                    'descricao': f'Chamado {chamado.codigo} foi {chamado.status.lower()}',
+                    'data': chamado.data_conclusao.strftime('%Y-%m-%d %H:%M:%S'),
+                    'icone': 'fa-check-circle' if chamado.status == 'Concluido' else 'fa-times-circle',
+                    'cor': 'success' if chamado.status == 'Concluido' else 'danger'
+                })
+
+            # Ordenar timeline por data
+            timeline.sort(key=lambda x: x['data'] if x['data'] else '0000-00-00 00:00:00')
+
+            chamado_info['timeline'] = timeline
+            chamado_info['anexos'] = anexos_info
+            chamado_info['total_anexos'] = len(anexos_info)
+            chamado_info['total_comunicacoes'] = len([t for t in timeline if t['tipo'] == 'comunicacao'])
+
+            chamados_data.append(chamado_info)
+
+        # Estatísticas gerais
+        estatisticas = {
+            'total': paginacao.total,
+            'concluidos': query.filter(Chamado.status == 'Concluido').count(),
+            'reabertos': query.filter(Chamado.reaberto == True).count() if hasattr(Chamado, 'reaberto') else 0,
+            'tempo_medio': '24h'  # Placeholder - implementar cálculo real
+        }
+
+        return json_response({
+            'chamados': chamados_data,
+            'estatisticas': estatisticas,
+            'paginacao': {
+                'pagina_atual': paginacao.page,
+                'total_paginas': paginacao.pages,
+                'itens_por_pagina': paginacao.per_page,
+                'total_itens': paginacao.total,
+                'tem_proximo': paginacao.has_next,
+                'tem_anterior': paginacao.has_prev
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar histórico completo de chamados: {str(e)}")
+        logger.error(traceback.format_exc())
+        return error_response('Erro interno no servidor')
+
 @painel_bp.route('/api/agentes/ativos', methods=['GET'])
 @api_login_required
 def listar_agentes_ativos():
@@ -3093,7 +3485,7 @@ def notificar_status_chamado(id):
         data = request.get_json()
         novo_status = data.get('status')
         if not novo_status:
-            return error_response('Status não fornecido.', 400)
+            return error_response('Status n��o fornecido.', 400)
         
         assunto = f"ATUALIZAÇÃO DO CHAMADO {chamado.codigo}"
         corpo = f"""
@@ -3686,7 +4078,7 @@ def sincronizar_sla_database():
                 {'nome': 'Independência do Brasil', 'mes': 9, 'dia': 7},
                 {'nome': 'Nossa Senhora Aparecida', 'mes': 10, 'dia': 12},
                 {'nome': 'Finados', 'mes': 11, 'dia': 2},
-                {'nome': 'Proclamação da República', 'mes': 11, 'dia': 15},
+                {'nome': 'Proclamaç��o da República', 'mes': 11, 'dia': 15},
                 {'nome': 'Natal', 'mes': 12, 'dia': 25},
             ]
 
