@@ -906,6 +906,10 @@ card.innerHTML = `
             `}
         </div>
         <div class="info-row">
+            <strong>Comunicações:</strong>
+            <span class="badge bg-secondary">${chamado.total_comunicacoes || 0}</span>
+        </div>
+        <div class="info-row">
             <strong>Anexos:</strong>
             <span class="badge bg-success">${chamado.total_anexos || 0}</span>
         </div>
@@ -3725,7 +3729,7 @@ function inicializarFiltroPermissoes() {
 
     console.log('Filtro de permissões inicializado com sucesso!');
 
-    // Carregar usuários inicialmente
+    // Carregar usu��rios inicialmente
     filtrarListaUsuarios('', 1);
 }
 
