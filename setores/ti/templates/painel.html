@@ -1020,7 +1020,7 @@
               <thead>
                 <tr>
                   <th>Usuário</th>
-                  <th>Ação</th>
+                  <th>A��ão</th>
                   <th>Detalhes</th>
                   <th>Data/Hora</th>
                   <th>IP</th>
@@ -2307,7 +2307,7 @@
                 <div class="form-check mb-2">
                   <input class="form-check-input" type="checkbox" id="autoAtribuicao">
                   <label class="form-check-label" for="autoAtribuicao">
-                    Auto-atribuição de chamados
+                    Auto-atribuiç��o de chamados
                   </label>
                 </div>
                 <div class="form-check mb-2">
@@ -2675,6 +2675,37 @@
             <label class="form-check-label" for="ticketCopia">
               Enviar cópia para mim
             </label>
+          </div>
+
+          <!-- Seção de Anexos -->
+          <div class="form-group mb-3">
+            <label class="form-label">
+              <i class="fas fa-paperclip me-2"></i>Anexos (opcional)
+            </label>
+            <div class="anexos-section-ticket" id="anexosSectionTicket">
+              <div class="upload-area-ticket" id="uploadAreaTicket" onclick="document.getElementById('fileInputTicket').click()">
+                <div class="upload-icon-ticket">
+                  <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <div class="upload-text-ticket">
+                  Clique aqui ou arraste arquivos para anexar
+                </div>
+                <div class="upload-info-ticket">
+                  Tipos aceitos: Imagens, Vídeos, Documentos<br>
+                  Máximo: 10MB por arquivo | 50MB total
+                </div>
+              </div>
+
+              <input type="file" id="fileInputTicket" class="file-input-ticket" multiple
+                     accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt">
+
+              <div class="anexos-list-ticket" id="anexosListTicket"></div>
+
+              <div class="anexos-info-ticket" id="anexosInfoTicket" style="display: none;">
+                <span id="totalAnexosTicket">0 arquivo(s) selecionado(s)</span>
+                <span class="limite-info-ticket" id="tamanhoTotalTicket">0 MB / 50 MB</span>
+              </div>
+            </div>
           </div>
         </form>
       </div>
