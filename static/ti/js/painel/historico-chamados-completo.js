@@ -335,13 +335,29 @@ class HistoricoCompletoManager {
     /**
      * Mostra anexos do chamado
      */
-    mostrarAnexosChamado(chamadoId) {
-        const chamado = this.chamados.find(c => c.id == chamadoId);
-        if (!chamado || !chamado.anexos?.length) return;
+    async mostrarAnexosChamado(chamadoId) {
+        let chamado = this.chamados.find(c => c.id == chamadoId);
+        if (!chamado) return;
+
+        if (!chamado.anexos || chamado.anexos.length === 0) {
+            try {
+                const resp = await fetch(`/ti/anexos/${chamadoId}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data && Array.isArray(data.anexos)) {
+                        chamado = { ...chamado, anexos: data.anexos, total_anexos: data.total };
+                        const idx = this.chamados.findIndex(c => c.id == chamadoId);
+                        if (idx >= 0) this.chamados[idx] = chamado;
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao carregar anexos:', e);
+            }
+        }
 
         const modal = this.criarModalAnexos(chamado);
         document.body.appendChild(modal);
-        
+
         const bsModal = new bootstrap.Modal(modal);
         bsModal.show();
 
@@ -356,7 +372,7 @@ class HistoricoCompletoManager {
      */
     criarModalDetalhes(chamado) {
         const modal = document.createElement('div');
-        modal.className = 'modal fade';
+        modal.className = 'modal fade historico-modal';
         modal.setAttribute('tabindex', '-1');
         modal.innerHTML = `
             <div class="modal-dialog modal-xl">
@@ -448,7 +464,7 @@ class HistoricoCompletoManager {
      */
     criarModalTimeline(chamado) {
         const modal = document.createElement('div');
-        modal.className = 'modal fade';
+        modal.className = 'modal fade historico-modal';
         modal.setAttribute('tabindex', '-1');
         
         const timelineHtml = chamado.timeline?.map(evento => `
@@ -550,7 +566,7 @@ class HistoricoCompletoManager {
      */
     criarModalAnexos(chamado) {
         const modal = document.createElement('div');
-        modal.className = 'modal fade';
+        modal.className = 'modal fade historico-modal';
         modal.setAttribute('tabindex', '-1');
         
         const anexosHtml = chamado.anexos?.map(anexo => `
