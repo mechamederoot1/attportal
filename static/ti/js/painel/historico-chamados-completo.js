@@ -356,20 +356,20 @@ class HistoricoCompletoManager {
      */
     criarModalDetalhes(chamado) {
         const modal = document.createElement('div');
-        modal.className = 'modal fade';
+        modal.className = 'modal fade responsive-modal';
         modal.setAttribute('tabindex', '-1');
         modal.innerHTML = `
-            <div class="modal-dialog modal-xl">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
                 <div class="modal-content bg-dark text-white">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">
                             <i class="fas fa-ticket-alt me-2"></i>
                             Detalhes Completos - ${chamado.codigo}
                         </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="row">
+                        <div class="row g-3">
                             <div class="col-md-6">
                                 <h6><i class="fas fa-user me-2"></i>Informações do Solicitante</h6>
                                 <table class="table table-dark table-sm">
@@ -392,8 +392,8 @@ class HistoricoCompletoManager {
                                 </table>
                             </div>
                         </div>
-                        
-                        <div class="row mt-3">
+
+                        <div class="row g-3 mt-1">
                             <div class="col-md-6">
                                 <h6><i class="fas fa-clock me-2"></i>Datas Importantes</h6>
                                 <table class="table table-dark table-sm">
@@ -416,7 +416,7 @@ class HistoricoCompletoManager {
                         </div>
 
                         ${chamado.descricao ? `
-                            <div class="mt-4">
+                            <div class="mt-3">
                                 <h6><i class="fas fa-file-text me-2"></i>Descrição do Problema</h6>
                                 <div class="bg-secondary p-3 rounded">
                                     ${chamado.descricao.replace(/\n/g, '<br>')}
@@ -491,15 +491,16 @@ class HistoricoCompletoManager {
             </div>
         `).join('') || '<p class="text-muted">Nenhum evento registrado na timeline.</p>';
 
+        modal.className = 'modal fade responsive-modal';
         modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
                 <div class="modal-content bg-dark text-white">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">
                             <i class="fas fa-history me-2"></i>
                             Timeline - ${chamado.codigo}
                         </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
                     <div class="modal-body">
                         <div class="timeline-container">
@@ -596,15 +597,16 @@ class HistoricoCompletoManager {
             </div>
         `).join('') || '<p class="text-muted">Nenhum anexo encontrado.</p>';
 
+        modal.className = 'modal fade responsive-modal';
         modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
                 <div class="modal-content bg-dark text-white">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">
                             <i class="fas fa-paperclip me-2"></i>
                             Anexos - ${chamado.codigo} (${chamado.total_anexos} arquivo${chamado.total_anexos !== 1 ? 's' : ''})
                         </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
                     <div class="modal-body">
                         <div class="row">
