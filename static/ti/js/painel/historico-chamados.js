@@ -427,7 +427,7 @@ class HistoricoChamados {
         modal.className = 'modal fade';
         modal.setAttribute('tabindex', '-1');
         modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content bg-dark text-white">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">
