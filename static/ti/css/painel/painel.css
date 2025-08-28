@@ -1260,7 +1260,7 @@ select option:checked {
 
 /* ============ SEÇÃO: MODAIS ============ */
 /* Modal de Detalhes do Chamado */
-.modal {
+#modalNotificacoes {
     position: fixed;
     top: 0;
     left: 0;
@@ -1275,7 +1275,7 @@ select option:checked {
     padding: var(--spacing-lg);
 }
 
-.modal.active {
+#modalNotificacoes.active {
     display: flex;
     animation: modalFadeIn 0.3s ease;
 }
@@ -1285,7 +1285,7 @@ select option:checked {
     to { opacity: 1; }
 }
 
-.modal-content {
+#modalNotificacoes .modal-content {
     background: var(--card-bg);
     border-radius: 12px;
     width: 90%;
@@ -1297,7 +1297,7 @@ select option:checked {
     position: relative;
 }
 
-.modal-header {
+#modalNotificacoes .modal-header {
     background: var(--dark-color);
     padding: var(--spacing-lg);
     border-bottom: 2px solid var(--primary-color);
@@ -1306,7 +1306,7 @@ select option:checked {
     align-items: center;
 }
 
-.modal-header h3 {
+#modalNotificacoes .modal-header h3 {
     color: var(--primary-color);
     font-size: 1.2rem;
     font-weight: 600;
@@ -1316,7 +1316,7 @@ select option:checked {
     gap: var(--spacing-md);
 }
 
-.modal-close {
+#modalNotificacoes .modal-close {
     background: none;
     border: none;
     color: var(--text-light);
@@ -1332,20 +1332,20 @@ select option:checked {
     transition: all 0.3s ease;
 }
 
-.modal-close:hover {
+#modalNotificacoes .modal-close:hover {
     background: rgba(247, 37, 133, 0.1);
     color: var(--danger-color);
     transform: rotate(90deg);
 }
 
-.modal-body {
+#modalNotificacoes .modal-body {
     padding: var(--spacing-lg);
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: var(--spacing-md);
 }
 
-.modal-body p {
+#modalNotificacoes .modal-body p {
     margin: 0;
     padding: var(--spacing-sm);
     background: rgba(255, 255, 255, 0.02);
@@ -1353,21 +1353,21 @@ select option:checked {
     border: 1px solid var(--border-color);
 }
 
-.modal-body p.full-width {
+#modalNotificacoes .modal-body p.full-width {
     grid-column: 1 / -1;
 }
 
-.modal-body strong {
+#modalNotificacoes .modal-body strong {
     color: var(--primary-color);
     font-weight: 500;
     margin-right: var(--spacing-sm);
 }
 
-.modal-body span {
+#modalNotificacoes .modal-body span {
     color: var(--light-color);
 }
 
-.modal-body label {
+#modalNotificacoes .modal-body label {
     display: block;
     color: var(--primary-color);
     font-weight: 500;
@@ -1375,7 +1375,7 @@ select option:checked {
     grid-column: 1 / -1;
 }
 
-.modal-body select {
+#modalNotificacoes .modal-body select {
     width: 100%;
     padding: var(--spacing-sm);
     background: var(--dark-color);
@@ -1388,19 +1388,19 @@ select option:checked {
     grid-column: 1 / -1;
 }
 
-.modal-body select:focus {
+#modalNotificacoes .modal-body select:focus {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 2px rgba(255, 98, 0, 0.2);
     outline: none;
 }
 
-.modal-body select option {
+#modalNotificacoes .modal-body select option {
     background: var(--dark-color);
     color: var(--light-color);
     padding: var(--spacing-sm);
 }
 
-.modal-footer {
+#modalNotificacoes .modal-footer {
     padding: var(--spacing-md);
     background: var(--dark-color);
     border-top: 1px solid var(--border-color);
@@ -1409,7 +1409,7 @@ select option:checked {
     gap: var(--spacing-sm);
 }
 
-.modal-footer button {
+#modalNotificacoes .modal-footer button {
     padding: var(--spacing-sm) var(--spacing-lg);
     border-radius: 6px;
     border: none;
@@ -1421,28 +1421,28 @@ select option:checked {
     transition: all 0.3s ease;
 }
 
-.modal-footer .btn-danger {
+#modalNotificacoes .modal-footer .btn-danger {
     background: var(--danger-color);
     color: white;
     margin-right: auto;
 }
 
-.modal-footer .btn-ticket {
+#modalNotificacoes .modal-footer .btn-ticket {
     background: var(--info-color);
     color: white;
 }
 
-.modal-footer .btn-update {
+#modalNotificacoes .modal-footer .btn-update {
     background: var(--success-color);
     color: white;
 }
 
-.modal-footer .btn-cancel {
+#modalNotificacoes .modal-footer .btn-cancel {
     background: var(--border-color);
     color: var(--light-color);
 }
 
-.modal-footer button:hover {
+#modalNotificacoes .modal-footer button:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -2048,22 +2048,22 @@ select option:checked {
     gap: var(--spacing-sm);
   }
   
-  .modal-content {
+  #modalNotificacoes .modal-content {
     margin: var(--spacing-sm);
     max-width: calc(100vw - calc(var(--spacing-sm) * 2));
   }
   
-  .modal-body {
+  #modalNotificacoes .modal-body {
     grid-template-columns: 1fr;
     padding: var(--spacing-md);
   }
   
-  .modal-footer {
+  #modalNotificacoes .modal-footer {
     flex-direction: column;
     gap: var(--spacing-xs);
   }
   
-  .modal-footer .btn-danger {
+  #modalNotificacoes .modal-footer .btn-danger {
     margin-right: 0;
     order: -1;
   }
@@ -2386,7 +2386,7 @@ a:focus-visible {
   color: var(--accent-color) !important;
 }
 
-[data-theme="light"] .modal-content {
+[data-theme="light"] #modalNotificacoes .modal-content {
   background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
@@ -2676,20 +2676,20 @@ a:focus-visible {
   color: white;
 }
 
-[data-theme="dark"] .modal-content,
-[data-theme="light"] .modal-content {
+[data-theme="dark"] #modalNotificacoes .modal-content,
+[data-theme="light"] #modalNotificacoes .modal-content {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   color: var(--text-primary);
 }
 
-[data-theme="dark"] .modal-header,
-[data-theme="light"] .modal-header {
+[data-theme="dark"] #modalNotificacoes .modal-header,
+[data-theme="light"] #modalNotificacoes .modal-header {
   border-bottom: 1px solid var(--border-color);
 }
 
-[data-theme="dark"] .modal-footer,
-[data-theme="light"] .modal-footer {
+[data-theme="dark"] #modalNotificacoes .modal-footer,
+[data-theme="light"] #modalNotificacoes .modal-footer {
   border-top: 1px solid var(--border-color);
 }
 

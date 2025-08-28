@@ -102,18 +102,19 @@ btnEnviarTicket.addEventListener('click', async function() {
     }
     
     try {
+        const formData = new FormData();
+        formData.append('assunto', ticketAssunto.value);
+        formData.append('mensagem', ticketMensagem.value);
+        formData.append('prioridade', String(!!ticketPrioridade.checked));
+        formData.append('enviar_copia', String(!!ticketCopia.checked));
+        formData.append('modelo', ticketModelo.value || '');
+        const fileInput = document.getElementById('fileInputTicket');
+        if (fileInput && fileInput.files && fileInput.files.length) {
+            Array.from(fileInput.files).forEach(f => formData.append('anexos', f));
+        }
         const response = await fetch(`/ti/painel/api/chamados/${chamadoId}/ticket`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                assunto: ticketAssunto.value,
-                mensagem: ticketMensagem.value,
-                prioridade: ticketPrioridade.checked,
-                enviar_copia: ticketCopia.checked,
-                modelo: ticketModelo.value
-            })
+            body: formData
         });
 
         if (!response.ok) {

@@ -112,7 +112,7 @@ def testar_configuracao_email():
         current_app.logger.error(f"🔍 Stack trace: {traceback.format_exc()}")
         return False
 
-def enviar_email(assunto, corpo, destinatarios=None):
+def enviar_email(assunto, corpo, destinatarios=None, anexos=None):
     if destinatarios is None:
         destinatarios = [EMAIL_TI]
 
@@ -148,6 +148,26 @@ def enviar_email(assunto, corpo, destinatarios=None):
         "saveToSentItems": "false"
     }
 
+    # Incluir anexos se houver
+    if anexos:
+        import base64
+        attachments_payload = []
+        for anexo in anexos:
+            nome = anexo.get('nome')
+            tipo = anexo.get('content_type') or 'application/octet-stream'
+            dados = anexo.get('dados')
+            if not (nome and dados is not None):
+                continue
+            content_b64 = base64.b64encode(dados).decode('utf-8')
+            attachments_payload.append({
+                "@odata.type": "#microsoft.graph.fileAttachment",
+                "name": nome,
+                "contentType": tipo,
+                "contentBytes": content_b64
+            })
+        if attachments_payload:
+            email_data["message"]["attachments"] = attachments_payload
+
     current_app.logger.info(f"📦 Email data preparado para: {[r['emailAddress']['address'] for r in email_data['message']['toRecipients']]}")
 
     try:
@@ -159,7 +179,7 @@ def enviar_email(assunto, corpo, destinatarios=None):
             current_app.logger.error(f"❌ Falha ao enviar e-mail. Status: {response.status_code}")
             return False
     except Exception as e:
-        current_app.logger.error(f"❌ Erro na requisição: {str(e)}")
+        current_app.logger.error(f"❌ Erro na requisi��ão: {str(e)}")
         return False
 
 def gerar_codigo_chamado():
@@ -1233,7 +1253,7 @@ def transferir_chamado(chamado_id):
         if not chamado:
             return jsonify({
                 'status': 'error',
-                'message': 'Chamado não encontrado'
+                'message': 'Chamado n��o encontrado'
             }), 404
 
         # Verificar se o usuário tem permissão para transferir

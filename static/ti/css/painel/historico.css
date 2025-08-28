@@ -1,0 +1,44 @@
+/* Estilos específicos para a seção Histórico de Chamados */
+#historico-chamados .card {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+/* Badges alinhadas ao tema */
+#historico-chamados .badge.bg-primary { background-color: var(--accent-color) !important; color: #fff; }
+#historico-chamados .badge.bg-info { background-color: var(--info-color) !important; color: #fff; }
+#historico-chamados .badge.bg-success { background-color: var(--success-color) !important; color: #fff; }
+#historico-chamados .badge.bg-warning { background-color: var(--warning-color) !important; color: #000; }
+#historico-chamados .badge.bg-danger { background-color: var(--danger-color) !important; color: #fff; }
+#historico-chamados .badge.bg-secondary { background-color: var(--bg-tertiary) !important; color: var(--text-primary); }
+
+/* Texto dos cards */
+#historico-chamados .card-title { color: var(--text-primary); font-weight: 600; }
+#historico-chamados small.text-muted { color: var(--text-light) !important; }
+#historico-chamados .problem-text { color: var(--text-primary); }
+#historico-chamados .description-text { color: var(--text-light); line-height: 1.5; }
+
+/* Modal Bootstrap dentro do histórico */
+#historico-chamados .modal-content { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); }
+#historico-chamados .modal-header { background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color) !important; }
+#historico-chamados .modal-footer { background: var(--bg-tertiary); border-top: 1px solid var(--border-color) !important; }
+#historico-chamados .btn-close, 
+#historico-chamados .btn-close-white { filter: invert(1); opacity: .8; }
+
+/* Tabelas dentro do modal */
+#historico-chamados .table { color: var(--text-primary); }
+#historico-chamados .table.table-dark { background-color: var(--bg-secondary); color: var(--text-primary); }
+#historico-chamados .table thead th { background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color); }
+#historico-chamados .table tbody td { border-color: var(--border-color); color: var(--text-primary); }
+
+/* Timeline */
+#historico-chamados .timeline-container::before { background: var(--border-color); }
+#historico-chamados .timeline-content { background: var(--bg-tertiary); border-left: 4px solid var(--border-color); }
+#historico-chamados .timeline-marker { box-shadow: 0 0 0 2px var(--bg-secondary); }
+#historico-chamados .timeline-marker.bg-primary { background: var(--accent-color); }
+#historico-chamados .timeline-marker.bg-info { background: var(--info-color); }
+#historico-chamados .timeline-marker.bg-success { background: var(--success-color); }
+#historico-chamados .timeline-marker.bg-warning { background: var(--warning-color); color: #000; }
+#historico-chamados .timeline-marker.bg-danger { background: var(--danger-color); }
+#historico-chamados .timeline-marker.bg-secondary { background: var(--bg-tertiary); color: var(--text-primary); }

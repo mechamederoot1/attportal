@@ -1288,19 +1288,44 @@ def transferir_chamado_agente(chamado_id):
 def enviar_ticket_chamado(chamado_id):
     """Envia ticket/comunicação relacionado a um chamado específico"""
     try:
-        if not request.is_json:
-            return error_response('Content-Type deve ser application/json', 400)
+        data = {}
+        anexos_payload = []
+        content_type = request.content_type or ''
 
-        data = request.get_json()
-        if not data:
-            return error_response('Dados não fornecidos', 400)
-
-        # Validar dados obrigatórios
-        assunto = data.get('assunto', '').strip()
-        mensagem = data.get('mensagem', '').strip()
-
-        if not assunto or not mensagem:
-            return error_response('Assunto e mensagem são obrigatórios', 400)
+        if content_type.startswith('multipart/form-data'):
+            form = request.form
+            assunto = (form.get('assunto') or '').strip()
+            mensagem = (form.get('mensagem') or '').strip()
+            if not assunto or not mensagem:
+                return error_response('Assunto e mensagem são obrigatórios', 400)
+            # Coletar anexos
+            try:
+                files = request.files.getlist('anexos')
+            except Exception:
+                files = []
+            for f in files or []:
+                try:
+                    anexos_payload.append({
+                        'nome': f.filename,
+                        'content_type': f.mimetype,
+                        'dados': f.read()
+                    })
+                except Exception:
+                    continue
+            prioridade_alta = form.get('prioridade', 'false').lower() == 'true'
+            enviar_copia = form.get('enviar_copia', 'false').lower() == 'true'
+            modelo = form.get('modelo') or ''
+        else:
+            if not request.is_json:
+                return error_response('Content-Type deve ser application/json ou multipart/form-data', 400)
+            data = request.get_json() or {}
+            assunto = (data.get('assunto') or '').strip()
+            mensagem = (data.get('mensagem') or '').strip()
+            if not assunto or not mensagem:
+                return error_response('Assunto e mensagem são obrigatórios', 400)
+            prioridade_alta = data.get('prioridade', False)
+            enviar_copia = data.get('enviar_copia', False)
+            modelo = data.get('modelo', '')
 
         # Verificar se o chamado existe
         chamado = Chamado.query.get(chamado_id)
@@ -1373,7 +1398,7 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
         # Tentar enviar o e-mail
         try:
             from setores.ti.routes import enviar_email
-            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios)
+            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios, anexos=anexos_payload)
 
             if not sucesso_email:
                 logger.warning(f"Falha ao enviar e-mail do ticket para chamado {chamado.codigo}")
@@ -1385,10 +1410,11 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
 
         # Registrar no histórico do chamado
         try:
+            qtd_anexos = len(anexos_payload) if 'anexos_payload' in locals() else 0
             historico = HistoricoTicket(
                 chamado_id=chamado.id,
                 acao='Ticket enviado',
-                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}',
+                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}\nAnexos: {qtd_anexos}',
                 usuario_responsavel=f"{current_user.nome} {current_user.sobrenome}",
                 data_acao=get_brazil_time().replace(tzinfo=None)
             )
@@ -1577,19 +1603,19 @@ def historico_chamados_completo():
 
             # 4. Buscar histórico de tickets (comunicações)
             try:
-                historico_tickets = HistoricoTicket.query.filter_by(chamado_id=chamado.id).order_by(HistoricoTicket.data_acao).all()
+                historico_tickets = HistoricoTicket.query.filter_by(chamado_id=chamado.id).order_by(HistoricoTicket.data_envio).all()
                 for ticket in historico_tickets:
                     timeline.append({
                         'tipo': 'comunicacao',
-                        'titulo': f'Comunicação: {ticket.acao}',
-                        'descricao': ticket.detalhes[:100] + '...' if len(ticket.detalhes) > 100 else ticket.detalhes,
-                        'data': ticket.data_acao.strftime('%Y-%m-%d %H:%M:%S') if ticket.data_acao else None,
+                        'titulo': f'Comunicação: {ticket.assunto}',
+                        'descricao': ticket.mensagem[:100] + '...' if len(ticket.mensagem or '') > 100 else (ticket.mensagem or ''),
+                        'data': ticket.data_envio.strftime('%Y-%m-%d %H:%M:%S') if ticket.data_envio else None,
                         'icone': 'fa-envelope',
                         'cor': 'secondary',
                         'detalhes': {
-                            'acao_completa': ticket.acao,
-                            'detalhes_completos': ticket.detalhes,
-                            'usuario_responsavel': ticket.usuario_responsavel
+                            'assunto': ticket.assunto,
+                            'destinatarios': ticket.destinatarios,
+                            'usuario_responsavel': f"{ticket.usuario.nome} {ticket.usuario.sobrenome}" if getattr(ticket, 'usuario', None) else None
                         }
                     })
             except Exception as e:
