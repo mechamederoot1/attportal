@@ -492,7 +492,7 @@ class HistoricoCompletoManager {
         `).join('') || '<p class="text-muted">Nenhum evento registrado na timeline.</p>';
 
         modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content bg-dark text-white">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">
@@ -597,7 +597,7 @@ class HistoricoCompletoManager {
         `).join('') || '<p class="text-muted">Nenhum anexo encontrado.</p>';
 
         modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content bg-dark text-white">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">
