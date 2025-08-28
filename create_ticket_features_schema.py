@@ -86,10 +86,12 @@ def criar_tabela_ticket_anexos():
         );
         """
         
-        db.engine.execute(text(create_table_sql))
+        with db.engine.connect() as conn:
+            conn.execute(text(create_table_sql))
+            conn.commit()
         print("✅ Tabela 'ticket_anexos' criada com sucesso")
         return True
-        
+
     except Exception as e:
         print(f"❌ Erro ao criar tabela 'ticket_anexos': {str(e)}")
         return False
