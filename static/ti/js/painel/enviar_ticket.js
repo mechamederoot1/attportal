@@ -125,7 +125,17 @@ btnEnviarTicket.addEventListener('click', async function() {
         const data = await response.json();
         alert('Ticket enviado com sucesso!');
         closeTicketModal();
-        
+        // Atualizar contadores no card do chamado
+        const chamado = window.chamadosData ? window.chamadosData.find(c => c.id == chamadoId) : null;
+        if (chamado) {
+            const anexosNovos = Number(data.anexos_salvos || 0);
+            chamado.total_anexos = (chamado.total_anexos || 0) + anexosNovos;
+            chamado.total_comunicacoes = (chamado.total_comunicacoes || 0) + 1;
+            if (document.getElementById('gerenciar-chamados')?.classList.contains('active') && typeof window.renderChamadosPage === 'function') {
+                window.renderChamadosPage(window.currentPage || 1);
+            }
+        }
+
     } catch (error) {
         console.error('Erro ao enviar ticket:', error);
         alert(`Erro ao enviar ticket: ${error.message}`);
