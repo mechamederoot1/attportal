@@ -451,7 +451,9 @@ class HistoricoCompletoManager {
         modal.className = 'modal fade';
         modal.setAttribute('tabindex', '-1');
         
-        const timelineHtml = chamado.timeline?.map(evento => `
+        const timelineHtml = (chamado.timeline || []).map((evento, idx) => {
+            const imgId = `tlimg-${idx}-${Date.now()}`;
+            return `
             <div class="timeline-item">
                 <div class="timeline-marker bg-${evento.cor}">
                     <i class="fas ${evento.icone}"></i>
@@ -464,15 +466,15 @@ class HistoricoCompletoManager {
                     <p class="mb-1">${evento.descricao}</p>
                     ${evento.tipo === 'anexo' ? `
                         <div class="mt-2 d-flex align-items-center gap-2">
-                            <a href="${evento.preview_url}" target="_blank" class="btn btn-sm btn-outline-info me-2">
+                            <button type="button" class="btn btn-sm btn-outline-info me-2" onclick="(function(){const el=document.getElementById('${imgId}'); if(el){el.style.display = el.style.display==='none'?'block':'none';}})()">
                                 <i class="fas fa-eye me-1"></i> Visualizar
-                            </a>
+                            </button>
                             <a href="/ti/download-anexo/${evento.anexo_id}" class="btn btn-sm btn-outline-secondary">
                                 <i class="fas fa-download me-1"></i> Baixar
                             </a>
                         </div>
                         ${evento.is_image ? `
-                            <div class="mt-2">
+                            <div class="mt-2" id="${imgId}" style="display:none;">
                                 <img src="${evento.preview_url}" alt="${(evento.detalhes && evento.detalhes.arquivo) || 'Anexo'}" style="max-width: 100%; height: auto; border-radius: 6px; border: 1px solid #495057;" />
                             </div>
                         ` : ''}
@@ -488,8 +490,8 @@ class HistoricoCompletoManager {
                         </details>
                     ` : ''}
                 </div>
-            </div>
-        `).join('') || '<p class="text-muted">Nenhum evento registrado na timeline.</p>';
+            </div>`;
+        }).join('') || '<p class="text-muted">Nenhum evento registrado na timeline.</p>';
 
         modal.className = 'modal fade responsive-modal';
         modal.innerHTML = `
