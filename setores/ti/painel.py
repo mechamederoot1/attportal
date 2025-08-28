@@ -1283,6 +1283,164 @@ def transferir_chamado_agente(chamado_id):
         logger.error(f"Erro ao transferir chamado: {str(e)}")
         return error_response('Erro interno no servidor')
 
+@painel_bp.route('/api/chamados/<int:chamado_id>/ticket', methods=['POST'])
+@api_login_required
+def enviar_ticket_chamado(chamado_id):
+    """Envia ticket/comunicação relacionado a um chamado específico"""
+    try:
+        if not request.is_json:
+            return error_response('Content-Type deve ser application/json', 400)
+
+        data = request.get_json()
+        if not data:
+            return error_response('Dados não fornecidos', 400)
+
+        # Validar dados obrigatórios
+        assunto = data.get('assunto', '').strip()
+        mensagem = data.get('mensagem', '').strip()
+
+        if not assunto or not mensagem:
+            return error_response('Assunto e mensagem são obrigatórios', 400)
+
+        # Verificar se o chamado existe
+        chamado = Chamado.query.get(chamado_id)
+        if not chamado:
+            return error_response('Chamado não encontrado', 404)
+
+        # Verificar permissões - agente atribuído ou administrador
+        agente = AgenteSuporte.query.filter_by(usuario_id=current_user.id, ativo=True).first()
+        if not agente and current_user.nivel_acesso != 'Administrador':
+            return error_response('Usuário não tem permissão para enviar tickets', 403)
+
+        if agente:
+            # Verificar se o chamado está atribuído ao agente
+            atribuicao = ChamadoAgente.query.filter_by(
+                chamado_id=chamado_id,
+                agente_id=agente.id,
+                ativo=True
+            ).first()
+
+            if not atribuicao and current_user.nivel_acesso != 'Administrador':
+                return error_response('Chamado não está atribuído a você', 403)
+
+        # Extrair outros dados opcionais
+        prioridade_alta = data.get('prioridade', False)
+        enviar_copia = data.get('enviar_copia', False)
+        modelo = data.get('modelo', '')
+
+        # Preparar informações do ticket
+        prioridade_texto = 'ALTA PRIORIDADE' if prioridade_alta else 'Prioridade Normal'
+
+        # Montar o assunto completo
+        assunto_completo = f"[{chamado.codigo}] {assunto}"
+        if prioridade_alta:
+            assunto_completo = f"[PRIORITÁRIO] {assunto_completo}"
+
+        # Montar corpo da mensagem
+        corpo_mensagem = f"""
+{mensagem}
+
+========== DETALHES DO CHAMADO ==========
+Código: {chamado.codigo}
+Protocolo: {chamado.protocolo}
+Solicitante: {chamado.solicitante}
+Problema: {chamado.problema}
+Status Atual: {chamado.status}
+Prioridade: {chamado.prioridade}
+Data de Abertura: {chamado.get_data_abertura_brazil().strftime('%d/%m/%Y %H:%M:%S') if chamado.get_data_abertura_brazil() else 'N/A'}
+
+Enviado por: {current_user.nome} {current_user.sobrenome}
+E-mail: {current_user.email}
+Data/Hora: {get_brazil_time().strftime('%d/%m/%Y %H:%M:%S')}
+
+---
+Sistema de Gerenciamento de Chamados - Evoque Fitness
+"""
+
+        # Preparar lista de destinatários
+        destinatarios = [chamado.email]  # Sempre enviar para o solicitante
+
+        if enviar_copia:
+            # Adicionar e-mail do agente/usuário atual
+            if current_user.email and current_user.email not in destinatarios:
+                destinatarios.append(current_user.email)
+
+            # Adicionar e-mail de TI se disponível
+            email_ti = os.getenv('EMAIL_TI')
+            if email_ti and email_ti not in destinatarios:
+                destinatarios.append(email_ti)
+
+        # Tentar enviar o e-mail
+        try:
+            from setores.ti.routes import enviar_email
+            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios)
+
+            if not sucesso_email:
+                logger.warning(f"Falha ao enviar e-mail do ticket para chamado {chamado.codigo}")
+                return error_response('Falha ao enviar e-mail. Verifique as configurações de e-mail.')
+
+        except Exception as email_error:
+            logger.error(f"Erro ao enviar e-mail do ticket: {str(email_error)}")
+            return error_response('Erro ao enviar e-mail. Tente novamente.')
+
+        # Registrar no histórico do chamado
+        try:
+            historico = HistoricoTicket(
+                chamado_id=chamado.id,
+                acao='Ticket enviado',
+                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}',
+                usuario_responsavel=f"{current_user.nome} {current_user.sobrenome}",
+                data_acao=get_brazil_time().replace(tzinfo=None)
+            )
+            db.session.add(historico)
+            db.session.commit()
+        except Exception as hist_error:
+            logger.warning(f"Erro ao registrar histórico: {str(hist_error)}")
+
+        # Registrar log da ação
+        registrar_log_acao(
+            usuario_id=current_user.id,
+            acao=f'Ticket enviado para chamado {chamado.codigo}',
+            categoria='chamados',
+            detalhes=f'Assunto: {assunto}. Destinatários: {", ".join(destinatarios)}',
+            recurso_afetado=str(chamado.id),
+            tipo_recurso='chamado',
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get('User-Agent')
+        )
+
+        # Emitir evento Socket.IO para notificação em tempo real
+        try:
+            if hasattr(current_app, 'socketio'):
+                current_app.socketio.emit('ticket_enviado', {
+                    'chamado_id': chamado.id,
+                    'codigo': chamado.codigo,
+                    'assunto': assunto,
+                    'remetente': f"{current_user.nome} {current_user.sobrenome}",
+                    'destinatarios': destinatarios,
+                    'prioridade': prioridade_texto,
+                    'timestamp': get_brazil_time().isoformat()
+                })
+        except Exception as socket_error:
+            logger.warning(f"Erro ao emitir evento Socket.IO: {str(socket_error)}")
+
+        return json_response({
+            'message': 'Ticket enviado com sucesso',
+            'ticket': {
+                'chamado_id': chamado.id,
+                'codigo': chamado.codigo,
+                'assunto': assunto,
+                'destinatarios': destinatarios,
+                'prioridade': prioridade_texto,
+                'data_envio': get_brazil_time().strftime('%d/%m/%Y %H:%M:%S')
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Erro ao enviar ticket para chamado {chamado_id}: {str(e)}")
+        return error_response('Erro interno no servidor')
+
 @painel_bp.route('/api/agentes/ativos', methods=['GET'])
 @api_login_required
 def listar_agentes_ativos():
@@ -3364,7 +3522,7 @@ def obter_chamados_detalhados_sla():
 @login_required
 @setor_required('TI')
 def limpar_historico_violacoes_sla():
-    """Limpa histórico de violações de SLA corrigindo datas de conclusão faltantes"""
+    """Limpa histórico de viola��ões de SLA corrigindo datas de conclusão faltantes"""
     try:
         logger.info(f"Iniciando limpeza de histórico SLA - usuário: {current_user.usuario}")
 
@@ -4396,7 +4554,7 @@ def listar_logs_acoes():
         })
 
     except Exception as e:
-        logger.error(f"Erro ao listar logs de ações: {str(e)}")
+        logger.error(f"Erro ao listar logs de a��ões: {str(e)}")
         logger.error(traceback.format_exc())
         return error_response('Erro interno no servidor')
 
