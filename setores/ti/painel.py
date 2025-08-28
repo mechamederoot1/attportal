@@ -1383,7 +1383,7 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
             logger.error(f"Erro ao enviar e-mail do ticket: {str(email_error)}")
             return error_response('Erro ao enviar e-mail. Tente novamente.')
 
-        # Registrar no histórico do chamado
+        # Registrar no hist��rico do chamado
         try:
             historico = HistoricoTicket(
                 chamado_id=chamado.id,
@@ -1577,19 +1577,19 @@ def historico_chamados_completo():
 
             # 4. Buscar histórico de tickets (comunicações)
             try:
-                historico_tickets = HistoricoTicket.query.filter_by(chamado_id=chamado.id).order_by(HistoricoTicket.data_acao).all()
+                historico_tickets = HistoricoTicket.query.filter_by(chamado_id=chamado.id).order_by(HistoricoTicket.data_envio).all()
                 for ticket in historico_tickets:
                     timeline.append({
                         'tipo': 'comunicacao',
-                        'titulo': f'Comunicação: {ticket.acao}',
-                        'descricao': ticket.detalhes[:100] + '...' if len(ticket.detalhes) > 100 else ticket.detalhes,
-                        'data': ticket.data_acao.strftime('%Y-%m-%d %H:%M:%S') if ticket.data_acao else None,
+                        'titulo': f'Comunicação: {ticket.assunto}',
+                        'descricao': ticket.mensagem[:100] + '...' if len(ticket.mensagem or '') > 100 else (ticket.mensagem or ''),
+                        'data': ticket.data_envio.strftime('%Y-%m-%d %H:%M:%S') if ticket.data_envio else None,
                         'icone': 'fa-envelope',
                         'cor': 'secondary',
                         'detalhes': {
-                            'acao_completa': ticket.acao,
-                            'detalhes_completos': ticket.detalhes,
-                            'usuario_responsavel': ticket.usuario_responsavel
+                            'assunto': ticket.assunto,
+                            'destinatarios': ticket.destinatarios,
+                            'usuario_responsavel': f"{ticket.usuario.nome} {ticket.usuario.sobrenome}" if getattr(ticket, 'usuario', None) else None
                         }
                     })
             except Exception as e:
