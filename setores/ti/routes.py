@@ -112,7 +112,7 @@ def testar_configuracao_email():
         current_app.logger.error(f"🔍 Stack trace: {traceback.format_exc()}")
         return False
 
-def enviar_email(assunto, corpo, destinatarios=None):
+def enviar_email(assunto, corpo, destinatarios=None, anexos=None):
     if destinatarios is None:
         destinatarios = [EMAIL_TI]
 
