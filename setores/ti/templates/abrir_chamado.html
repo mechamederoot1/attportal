@@ -596,6 +596,32 @@
 
                 <input type="hidden" name="prioridade" id="prioridadeInput" value="Normal" />
 
+                <!-- Seção de Anexos -->
+                <div class="anexos-section" id="anexosSection">
+                    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="upload-text">
+                            Clique aqui ou arraste arquivos para anexar
+                        </div>
+                        <div class="upload-info">
+                            Tipos aceitos: Imagens (JPG, PNG, GIF), Vídeos (MP4, AVI, MOV), Documentos (PDF, DOC, XLS)<br>
+                            Máximo: 10MB por arquivo | 50MB total por chamado
+                        </div>
+                    </div>
+
+                    <input type="file" id="fileInput" class="file-input" multiple
+                           accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt">
+
+                    <div class="anexos-list" id="anexosList"></div>
+
+                    <div class="anexos-info" id="anexosInfo" style="display: none;">
+                        <span id="totalAnexos">0 arquivo(s) selecionado(s)</span>
+                        <span class="limite-info" id="tamanhoTotal">0 MB / 50 MB</span>
+                    </div>
+                </div>
+
                 <div class="mt-4">
                     <button type="submit" class="btn btn-primary mb-2">
                         <i class="fas fa-paper-plane"></i>
