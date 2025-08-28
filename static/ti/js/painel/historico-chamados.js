@@ -424,20 +424,20 @@ class HistoricoChamados {
      */
     criarModalDetalhes(chamado) {
         const modal = document.createElement('div');
-        modal.className = 'modal fade';
+        modal.className = 'modal fade responsive-modal';
         modal.setAttribute('tabindex', '-1');
         modal.innerHTML = `
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
                 <div class="modal-content bg-dark text-white">
                     <div class="modal-header border-secondary">
                         <h5 class="modal-title">
                             <i class="fas fa-ticket-alt me-2"></i>
                             Detalhes do Chamado ${chamado.codigo}
                         </h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="row">
+                        <div class="row g-3">
                             <div class="col-md-6">
                                 <p><strong>Protocolo:</strong> ${chamado.protocolo}</p>
                                 <p><strong>Solicitante:</strong> ${chamado.solicitante}</p>
@@ -453,8 +453,8 @@ class HistoricoChamados {
                                 ${chamado.internet_item ? `<p><strong>Item Internet:</strong> ${chamado.internet_item}</p>` : ''}
                             </div>
                         </div>
-                        
-                        <div class="row">
+
+                        <div class="row g-3 mt-1">
                             <div class="col-md-6">
                                 <p><strong>Data Abertura:</strong> ${this.formatarDataCompleta(chamado.data_abertura)}</p>
                                 ${chamado.data_primeira_resposta ? `<p><strong>Primeira Resposta:</strong> ${this.formatarDataCompleta(chamado.data_primeira_resposta)}</p>` : ''}
