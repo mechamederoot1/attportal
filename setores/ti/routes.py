@@ -411,7 +411,7 @@ def abrir_chamado():
                 )
 
                 corpo_email = f"""
-Seu chamado foi registrado com sucesso! Aqui estão os detalhes:
+Seu chamado foi registrado com sucesso! Aqui est��o os detalhes:
 
 Chamado: {codigo_gerado}
 Protocolo: {protocolo_gerado}
@@ -603,6 +603,304 @@ def ver_meus_chamados():
             }), 500
 
     return render_template('ver_meus_chamados.html')
+
+# ==================== ROTAS PARA ANEXOS ====================
+
+@ti_bp.route('/abrir-chamado-com-anexos', methods=['POST'])
+@login_required
+@setor_required('ti')
+def abrir_chamado_com_anexos():
+    """Rota para abrir chamado com anexos"""
+    from .anexos_utils import save_uploaded_file
+    try:
+        # Obter dados do formulário
+        codigo_gerado = gerar_codigo_chamado()
+        protocolo_gerado = gerar_protocolo()
+
+        dados_chamado = {
+            'nome_solicitante': request.form['nome_solicitante'],
+            'cargo': request.form['cargo'],
+            'email': request.form['email'],
+            'telefone': request.form['telefone'],
+            'unidade_id': request.form['unidade'],
+            'problema_id': request.form['problema'],
+            'internet_item_id': request.form.get('internet_item', ''),
+            'descricao': request.form.get('descricao', ''),
+            'data_visita_str': request.form.get('data_visita', '').strip(),
+            'prioridade': request.form.get('prioridade', 'Normal')
+        }
+
+        unidade_obj = Unidade.query.get(dados_chamado['unidade_id'])
+        problema_obj = ProblemaReportado.query.get(dados_chamado['problema_id'])
+
+        if not unidade_obj or not problema_obj:
+            return jsonify({
+                'status': 'error',
+                'message': 'Unidade ou problema inválido.'
+            }), 400
+
+        unidade_nome_completo = unidade_obj.nome
+        problema_nome = problema_obj.nome
+
+        internet_item_nome = ""
+        if dados_chamado['internet_item_id']:
+            item_obj = ItemInternet.query.get(dados_chamado['internet_item_id'])
+            internet_item_nome = item_obj.nome if item_obj else ""
+
+        data_visita = None
+        if dados_chamado['data_visita_str']:
+            try:
+                data_visita = datetime.strptime(dados_chamado['data_visita_str'], '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Formato de data inválido. Use AAAA-MM-DD.'
+                }), 400
+
+        descricao_completa = dados_chamado['descricao']
+        if problema_nome == 'Internet' and internet_item_nome:
+            descricao_completa = f"Item: {internet_item_nome}\nDescrição: {descricao_completa}"
+
+        # Usar horário do Brasil para data de abertura
+        data_abertura_brazil = get_brazil_time()
+
+        novo_chamado = Chamado(
+            codigo=codigo_gerado,
+            protocolo=protocolo_gerado,
+            solicitante=dados_chamado['nome_solicitante'],
+            cargo=dados_chamado['cargo'],
+            email=dados_chamado['email'],
+            telefone=dados_chamado['telefone'],
+            unidade=unidade_nome_completo,
+            problema=problema_nome,
+            internet_item=internet_item_nome,
+            descricao=descricao_completa,
+            data_visita=data_visita,
+            status='Aberto',
+            prioridade=dados_chamado['prioridade'],
+            data_abertura=data_abertura_brazil.replace(tzinfo=None),
+            usuario_id=current_user.id
+        )
+
+        db.session.add(novo_chamado)
+        db.session.flush()  # Para obter o ID do chamado
+
+        # Processar anexos
+        anexos_salvos = []
+        if 'anexos' in request.files:
+            files = request.files.getlist('anexos')
+            for file in files:
+                if file and file.filename:
+                    success, message, anexo = save_uploaded_file(
+                        file, novo_chamado.id, current_user.id
+                    )
+                    if success:
+                        anexos_salvos.append(anexo)
+                        current_app.logger.info(f"Anexo salvo: {file.filename} para chamado {codigo_gerado}")
+                    else:
+                        current_app.logger.error(f"Erro ao salvar anexo {file.filename}: {message}")
+
+        db.session.commit()
+
+        # Emitir notificação Socket.IO
+        if hasattr(current_app, 'socketio'):
+            current_app.socketio.emit('novo_chamado', {
+                'id': novo_chamado.id,
+                'codigo': codigo_gerado,
+                'protocolo': protocolo_gerado,
+                'solicitante': dados_chamado['nome_solicitante'],
+                'problema': problema_nome,
+                'unidade': unidade_nome_completo,
+                'status': 'Aberto',
+                'data_abertura': data_abertura_brazil.isoformat(),
+                'prioridade': dados_chamado['prioridade'],
+                'anexos': len(anexos_salvos)
+            })
+
+        # Preparar corpo do email
+        visita_tecnica_texto = (
+            f"Sim, agendada para {data_visita.strftime('%d/%m/%Y')}"
+            if data_visita else "Não requisitada"
+        )
+
+        internet_item_texto = (
+            f"\nItem de Internet: {internet_item_nome}"
+            if problema_nome == 'Internet' and internet_item_nome
+            else ""
+        )
+
+        anexos_texto = ""
+        if anexos_salvos:
+            anexos_texto = f"\n\nAnexos enviados ({len(anexos_salvos)}):"
+            for anexo in anexos_salvos:
+                anexos_texto += f"\n- {anexo.nome_original} ({anexo.get_tamanho_formatado()})"
+
+        corpo_email = f"""
+Seu chamado foi registrado com sucesso! Aqui estão os detalhes:
+
+Chamado: {codigo_gerado}
+Protocolo: {protocolo_gerado}
+Prioridade: {dados_chamado['prioridade']}
+Nome do solicitante: {dados_chamado['nome_solicitante']}
+Cargo: {dados_chamado['cargo']}
+Unidade: {unidade_nome_completo}
+E-mail: {dados_chamado['email']}
+Telefone: {dados_chamado['telefone']}
+Problema reportado: {problema_nome}{internet_item_texto}
+Descrição: {dados_chamado['descricao']}
+Visita técnica: {visita_tecnica_texto}{anexos_texto}
+
+⚠️ Caso precise acompanhar o status do chamado, utilize o código acima.
+
+Atenciosamente,
+Suporte Evoque!
+
+Por favor, não responda este e-mail, essa é uma mensagem automática!
+"""
+        destinatarios = [dados_chamado['email'], EMAIL_TI]
+        assunto_email = f"ACADEMIA EVOQUE - CHAMADO #{codigo_gerado}"
+
+        sucesso_email = enviar_email(assunto_email, corpo_email, destinatarios)
+        if not sucesso_email:
+            current_app.logger.warning(f"Falha ao enviar e-mail para o chamado {codigo_gerado}")
+
+        return jsonify({
+            'status': 'success',
+            'codigo_chamado': codigo_gerado,
+            'protocolo_chamado': protocolo_gerado,
+            'anexos_salvos': len(anexos_salvos),
+            'notificacao_data': {
+                'id': novo_chamado.id,
+                'codigo': codigo_gerado,
+                'solicitante': dados_chamado['nome_solicitante'],
+                'problema': problema_nome,
+                'data_abertura': data_abertura_brazil.strftime('%d/%m/%Y %H:%M:%S'),
+                'anexos': len(anexos_salvos)
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erro ao salvar chamado com anexos: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Erro ao abrir chamado. Tente novamente.'
+        }), 500
+
+@ti_bp.route('/download-anexo/<int:anexo_id>')
+@login_required
+@setor_required('ti')
+def download_anexo(anexo_id):
+    """Rota para download de anexos"""
+    from database import ChamadoAnexo
+    from flask import send_file
+    import os
+
+    try:
+        anexo = ChamadoAnexo.query.get(anexo_id)
+        if not anexo or not anexo.ativo:
+            return jsonify({'error': 'Anexo não encontrado'}), 404
+
+        # Verificar permissões - usuário deve ser dono do chamado ou admin/agente
+        if (anexo.chamado.usuario_id != current_user.id and
+            not current_user.tem_permissao('Administrador') and
+            not current_user.eh_agente_suporte_ativo()):
+            return jsonify({'error': 'Sem permissão para acessar este anexo'}), 403
+
+        # Verificar se arquivo existe
+        if not os.path.exists(anexo.caminho_arquivo):
+            current_app.logger.error(f"Arquivo não encontrado: {anexo.caminho_arquivo}")
+            return jsonify({'error': 'Arquivo não encontrado no servidor'}), 404
+
+        # Log do download
+        current_app.logger.info(f"Download do anexo {anexo.nome_original} por usuário {current_user.id}")
+
+        return send_file(
+            anexo.caminho_arquivo,
+            as_attachment=True,
+            download_name=anexo.nome_original,
+            mimetype=anexo.tipo_mime
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Erro no download do anexo {anexo_id}: {str(e)}")
+        return jsonify({'error': 'Erro interno no servidor'}), 500
+
+@ti_bp.route('/anexos/<int:chamado_id>')
+@login_required
+@setor_required('ti')
+def listar_anexos(chamado_id):
+    """Rota para listar anexos de um chamado"""
+    from database import ChamadoAnexo
+
+    try:
+        chamado = Chamado.query.get(chamado_id)
+        if not chamado:
+            return jsonify({'error': 'Chamado não encontrado'}), 404
+
+        # Verificar permissões
+        if (chamado.usuario_id != current_user.id and
+            not current_user.tem_permissao('Administrador') and
+            not current_user.eh_agente_suporte_ativo()):
+            return jsonify({'error': 'Sem permissão para visualizar anexos deste chamado'}), 403
+
+        anexos = chamado.get_anexos_ativos()
+        anexos_data = []
+
+        for anexo in anexos:
+            anexos_data.append({
+                'id': anexo.id,
+                'nome_original': anexo.nome_original,
+                'tamanho_formatado': anexo.get_tamanho_formatado(),
+                'tipo_arquivo': anexo.get_tipo_arquivo(),
+                'icone': anexo.get_icone_arquivo(),
+                'data_upload': anexo.get_data_upload_brazil().strftime('%d/%m/%Y %H:%M') if anexo.data_upload else None,
+                'usuario_upload': f"{anexo.usuario_upload.nome} {anexo.usuario_upload.sobrenome}",
+                'download_url': url_for('ti.download_anexo', anexo_id=anexo.id),
+                'is_image': anexo.is_image(),
+                'is_video': anexo.is_video(),
+                'is_document': anexo.is_document()
+            })
+
+        return jsonify({
+            'status': 'success',
+            'anexos': anexos_data,
+            'total': len(anexos_data),
+            'tamanho_total': chamado.get_tamanho_total_anexos(),
+            'tamanho_total_formatado': anexos[0].get_tamanho_formatado() if anexos else '0 B'
+        })
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao listar anexos do chamado {chamado_id}: {str(e)}")
+        return jsonify({'error': 'Erro interno no servidor'}), 500
+
+@ti_bp.route('/remover-anexo/<int:anexo_id>', methods=['DELETE'])
+@login_required
+@setor_required('ti')
+def remover_anexo(anexo_id):
+    """Rota para remover anexo"""
+    from .anexos_utils import delete_attachment
+
+    try:
+        success, message = delete_attachment(anexo_id, current_user.id)
+
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': message
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': message
+            }), 400
+
+    except Exception as e:
+        current_app.logger.error(f"Erro ao remover anexo {anexo_id}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Erro interno no servidor'
+        }), 500
 
 @ti_bp.errorhandler(404)
 def not_found_error(error):
