@@ -2610,7 +2610,8 @@ def listar_chamados():
                     'prioridade': c.prioridade if hasattr(c, 'prioridade') else 'Normal',
                     'visita_tecnica': c.visita_tecnica if hasattr(c, 'visita_tecnica') else False,
                     'agente': agente_info,
-                    'agente_id': agente_info['id'] if agente_info else None
+                    'agente_id': agente_info['id'] if agente_info else None,
+                    'total_anexos': c.get_total_anexos()
                 }
                 chamados_list.append(chamado_data)
                 logger.debug(f"Chamado {c.id} formatado com sucesso")
