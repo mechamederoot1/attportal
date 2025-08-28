@@ -46,10 +46,12 @@ def criar_tabela_chamado_reabertura():
         );
         """
         
-        db.engine.execute(text(create_table_sql))
+        with db.engine.connect() as conn:
+            conn.execute(text(create_table_sql))
+            conn.commit()
         print("✅ Tabela 'chamado_reabertura' criada com sucesso")
         return True
-        
+
     except Exception as e:
         print(f"❌ Erro ao criar tabela 'chamado_reabertura': {str(e)}")
         return False
