@@ -29,9 +29,14 @@ from setores.ti.sla_utils import (
 
 painel_bp = Blueprint('painel', __name__, template_folder='templates')
 
-# Configurar logging
-logging.basicConfig(level=logging.DEBUG)
+# Configurar logging sem afetar o root logger
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _formatter = logging.Formatter('%(levelname)s:%(name)s:%(message)s')
+    _handler.setFormatter(_formatter)
+    logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
 
 def api_login_required(f):
     """Decorador que retorna erro JSON se não autenticado"""
@@ -2564,8 +2569,13 @@ def listar_chamados():
         logger.debug("Iniciando consulta de chamados...")
         from database import ChamadoAgente, AgenteSuporte, User
 
-        # Fazer join com agentes se existir
-        chamados = db.session.query(Chamado).outerjoin(
+        # Fazer join com agentes para evitar N+1 queries
+        resultados = db.session.query(
+            Chamado,
+            ChamadoAgente,
+            AgenteSuporte,
+            User
+        ).outerjoin(
             ChamadoAgente, (Chamado.id == ChamadoAgente.chamado_id) & (ChamadoAgente.ativo == True)
         ).outerjoin(
             AgenteSuporte, ChamadoAgente.agente_id == AgenteSuporte.id
@@ -2573,10 +2583,10 @@ def listar_chamados():
             User, AgenteSuporte.usuario_id == User.id
         ).order_by(Chamado.data_abertura.desc()).all()
 
-        logger.debug(f"Total de chamados encontrados: {len(chamados)}")
+        logger.debug(f"Total de chamados encontrados: {len(resultados)}")
 
         chamados_list = []
-        for c in chamados:
+        for c, chamado_agente, agente_suporte, usuario in resultados:
             try:
                 # Converter data de abertura para timezone do Brasil
                 data_abertura_brazil = c.get_data_abertura_brazil()
@@ -2585,19 +2595,14 @@ def listar_chamados():
                 # Converter data de visita se existir
                 data_visita_str = c.data_visita.strftime('%d/%m/%Y') if c.data_visita else None
 
-                # Buscar agente atribuído
+                # Agente atribuído (dos joins acima)
                 agente_info = None
-                chamado_agente = ChamadoAgente.query.filter_by(
-                    chamado_id=c.id,
-                    ativo=True
-                ).first()
-
-                if chamado_agente and chamado_agente.agente:
+                if chamado_agente and agente_suporte and usuario:
                     agente_info = {
-                        'id': chamado_agente.agente.id,
-                        'nome': f"{chamado_agente.agente.usuario.nome} {chamado_agente.agente.usuario.sobrenome}",
-                        'usuario': chamado_agente.agente.usuario.usuario,
-                        'nivel_experiencia': chamado_agente.agente.nivel_experiencia
+                        'id': agente_suporte.id,
+                        'nome': f"{usuario.nome} {usuario.sobrenome}",
+                        'usuario': usuario.usuario,
+                        'nivel_experiencia': agente_suporte.nivel_experiencia
                     }
 
                 chamado_data = {
@@ -2621,7 +2626,6 @@ def listar_chamados():
                     'agente_id': agente_info['id'] if agente_info else None
                 }
                 chamados_list.append(chamado_data)
-                logger.debug(f"Chamado {c.id} formatado com sucesso")
             except Exception as e:
                 logger.error(f"Erro ao formatar chamado {c.id}: {str(e)}")
                 continue
