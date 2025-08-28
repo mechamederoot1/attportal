@@ -1398,7 +1398,7 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
         # Tentar enviar o e-mail
         try:
             from setores.ti.routes import enviar_email
-            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios)
+            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios, anexos=anexos_payload)
 
             if not sucesso_email:
                 logger.warning(f"Falha ao enviar e-mail do ticket para chamado {chamado.codigo}")
@@ -1408,12 +1408,13 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
             logger.error(f"Erro ao enviar e-mail do ticket: {str(email_error)}")
             return error_response('Erro ao enviar e-mail. Tente novamente.')
 
-        # Registrar no hist��rico do chamado
+        # Registrar no histórico do chamado
         try:
+            qtd_anexos = len(anexos_payload) if 'anexos_payload' in locals() else 0
             historico = HistoricoTicket(
                 chamado_id=chamado.id,
                 acao='Ticket enviado',
-                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}',
+                detalhes=f'Assunto: {assunto}\nMensagem enviada para: {", ".join(destinatarios)}\nAnexos: {qtd_anexos}',
                 usuario_responsavel=f"{current_user.nome} {current_user.sobrenome}",
                 data_acao=get_brazil_time().replace(tzinfo=None)
             )
