@@ -905,6 +905,10 @@ card.innerHTML = `
                 </button>
             `}
         </div>
+        <div class="info-row">
+            <strong>Anexos:</strong>
+            <span class="badge bg-success">${chamado.total_anexos || 0}</span>
+        </div>
     </div>
     <div class="card-footer">
         <select id="status-${chamado.id}">
@@ -1161,6 +1165,9 @@ const modalCloseBtn = document.getElementById('modalClose');
 const modalCancelBtn = document.getElementById('modalCancel');
 const modalSaveBtn = document.getElementById('modalSave');
 const modalSendTicketBtn = document.getElementById('modalSendTicket');
+const modalAnexosSection = document.getElementById('modalAnexosSection');
+const modalAnexosList = document.getElementById('modalAnexosList');
+const modalQtdAnexos = document.getElementById('modalQtdAnexos');
 
 const modalCodigo = document.getElementById('modalCodigo');
 const modalProtocolo = document.getElementById('modalProtocolo');
@@ -1191,12 +1198,65 @@ function openModal(chamado) {
     modalData.textContent = chamado.data_abertura.split(' ')[0];
     modalStatusSelect.value = chamado.status;
 
+    if (modalAnexosSection && modalAnexosList && modalQtdAnexos) {
+        modalAnexosSection.style.display = 'none';
+        modalAnexosList.innerHTML = '';
+        carregarAnexosNoModal(chamado.id);
+    }
+
     modal.classList.add('active');
 }
 
 function closeModal() {
     modal.classList.remove('active');
     currentModalChamadoId = null;
+}
+
+function getAnexoIcone(tipo) {
+    const map = {
+        'Imagem': 'fa-image',
+        'Vídeo': 'fa-video',
+        'Documento': 'fa-file-alt',
+        'PDF': 'fa-file-pdf',
+        'Excel': 'fa-file-excel',
+        'Word': 'fa-file-word',
+        'PowerPoint': 'fa-file-powerpoint'
+    };
+    return map[tipo] || 'fa-file';
+}
+
+async function carregarAnexosNoModal(chamadoId) {
+    try {
+        const resp = await fetch(`/ti/anexos/${chamadoId}`);
+        if (!resp.ok) {
+            if (modalAnexosSection) modalAnexosSection.style.display = 'none';
+            return;
+        }
+        const data = await resp.json();
+        const anexos = Array.isArray(data.anexos) ? data.anexos : [];
+        modalQtdAnexos.textContent = anexos.length;
+        if (anexos.length === 0) {
+            modalAnexosList.innerHTML = '<p class="text-muted">Nenhum anexo encontrado.</p>';
+            modalAnexosSection.style.display = 'none';
+            return;
+        }
+        modalAnexosList.innerHTML = anexos.map(a => `
+            <div class="attachment-item">
+                <i class="fas ${getAnexoIcone(a.tipo_arquivo)}"></i>
+                <div class="attachment-info">
+                    <div class="attachment-name">${a.nome_original}</div>
+                    <div class="attachment-meta">${a.tamanho_formatado} • ${a.tipo_arquivo} • ${a.data_upload} • ${a.usuario_upload}</div>
+                </div>
+                <a class="btn btn-outline-info btn-sm" href="/ti/download-anexo/${a.id}" target="_blank" title="Download">
+                    <i class="fas fa-download"></i>
+                </a>
+            </div>
+        `).join('');
+        modalAnexosSection.style.display = 'block';
+    } catch (e) {
+        console.error('Erro ao carregar anexos do modal:', e);
+        if (modalAnexosSection) modalAnexosSection.style.display = 'none';
+    }
 }
 
 // Event Listeners do Modal de Chamados

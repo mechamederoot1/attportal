@@ -2610,7 +2610,8 @@ def listar_chamados():
                     'prioridade': c.prioridade if hasattr(c, 'prioridade') else 'Normal',
                     'visita_tecnica': c.visita_tecnica if hasattr(c, 'visita_tecnica') else False,
                     'agente': agente_info,
-                    'agente_id': agente_info['id'] if agente_info else None
+                    'agente_id': agente_info['id'] if agente_info else None,
+                    'total_anexos': c.get_total_anexos()
                 }
                 chamados_list.append(chamado_data)
                 logger.debug(f"Chamado {c.id} formatado com sucesso")
@@ -3541,19 +3542,27 @@ Suporte Evoque.
 def enviar_ticket(id):
     try:
         chamado = Chamado.query.get_or_404(id)
-        
-        if not request.is_json:
-            return error_response('Content-Type deve ser application/json', 400)
-            
-        data = request.get_json()
-        if not data:
-            return error_response('Dados não fornecidos', 400)
-        
-        assunto = data.get('assunto', f"Atualização do Chamado {chamado.codigo}")
-        mensagem = data.get('mensagem')
-        enviar_copia = data.get('enviar_copia', False)
-        prioridade = data.get('prioridade', False)
-        
+
+        # Suporte a JSON e multipart/form-data
+        assunto = None
+        mensagem = None
+        enviar_copia = False
+        prioridade = False
+        anexos_salvos = []
+
+        if request.is_json:
+            data = request.get_json() or {}
+            assunto = data.get('assunto', f"Atualização do Chamado {chamado.codigo}")
+            mensagem = data.get('mensagem')
+            enviar_copia = data.get('enviar_copia', False)
+            prioridade = data.get('prioridade', False)
+        else:
+            # multipart/form-data
+            assunto = request.form.get('assunto', f"Atualização do Chamado {chamado.codigo}")
+            mensagem = request.form.get('mensagem')
+            enviar_copia = request.form.get('enviar_copia', 'false').lower() == 'true'
+            prioridade = request.form.get('prioridade', 'false').lower() == 'true'
+
         if not mensagem:
             return error_response('A mensagem é obrigatória', 400)
 
@@ -3600,6 +3609,26 @@ Atenciosamente,
 Equipe de Suporte TI - Evoque Fitness
 """
 
+        # Processar anexos (se multipart/form-data)
+        try:
+            if request.files:
+                from setores.ti.anexos_utils import save_uploaded_file
+                files = request.files.getlist('anexos')
+                for f in files:
+                    if f and f.filename:
+                        ok, msg, anexo = save_uploaded_file(f, chamado.id, current_user.id)
+                        if ok and anexo:
+                            anexos_salvos.append({
+                                'id': anexo.id,
+                                'nome_original': anexo.nome_original,
+                                'tamanho_formatado': anexo.get_tamanho_formatado(),
+                                'tipo_arquivo': anexo.get_tipo_arquivo()
+                            })
+                        else:
+                            logger.warning(f"Falha ao salvar anexo '{getattr(f,'filename', '')}': {msg}")
+        except Exception as anex_err:
+            logger.error(f"Erro ao processar anexos: {str(anex_err)}")
+
         sucesso = enviar_email(
             assunto=assunto,
             corpo=mensagem_formatada,
@@ -3616,7 +3645,7 @@ Equipe de Suporte TI - Evoque Fitness
             )
             db.session.add(historico)
             db.session.commit()
-            
+
             # Emitir evento Socket.IO apenas se a conexão estiver disponível
             try:
                 if hasattr(current_app, 'socketio'):
@@ -3625,15 +3654,17 @@ Equipe de Suporte TI - Evoque Fitness
                         'codigo': chamado.codigo,
                         'assunto': assunto,
                         'destinatarios': destinatarios,
+                        'anexos': len(anexos_salvos),
                         'timestamp': get_brazil_time().isoformat()
                     })
             except Exception as socket_error:
                 logger.warning(f"Erro ao emitir evento Socket.IO: {str(socket_error)}")
-            
+
             return json_response({
                 'message': 'Ticket enviado com sucesso',
                 'chamado_id': chamado.id,
-                'destinatarios': destinatarios
+                'destinatarios': destinatarios,
+                'anexos_salvos': len(anexos_salvos)
             })
         else:
             raise Exception('Falha ao enviar e-mail')
