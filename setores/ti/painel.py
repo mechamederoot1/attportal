@@ -1288,19 +1288,44 @@ def transferir_chamado_agente(chamado_id):
 def enviar_ticket_chamado(chamado_id):
     """Envia ticket/comunicação relacionado a um chamado específico"""
     try:
-        if not request.is_json:
-            return error_response('Content-Type deve ser application/json', 400)
+        data = {}
+        anexos_payload = []
+        content_type = request.content_type or ''
 
-        data = request.get_json()
-        if not data:
-            return error_response('Dados não fornecidos', 400)
-
-        # Validar dados obrigatórios
-        assunto = data.get('assunto', '').strip()
-        mensagem = data.get('mensagem', '').strip()
-
-        if not assunto or not mensagem:
-            return error_response('Assunto e mensagem são obrigatórios', 400)
+        if content_type.startswith('multipart/form-data'):
+            form = request.form
+            assunto = (form.get('assunto') or '').strip()
+            mensagem = (form.get('mensagem') or '').strip()
+            if not assunto or not mensagem:
+                return error_response('Assunto e mensagem são obrigatórios', 400)
+            # Coletar anexos
+            try:
+                files = request.files.getlist('anexos')
+            except Exception:
+                files = []
+            for f in files or []:
+                try:
+                    anexos_payload.append({
+                        'nome': f.filename,
+                        'content_type': f.mimetype,
+                        'dados': f.read()
+                    })
+                except Exception:
+                    continue
+            prioridade_alta = form.get('prioridade', 'false').lower() == 'true'
+            enviar_copia = form.get('enviar_copia', 'false').lower() == 'true'
+            modelo = form.get('modelo') or ''
+        else:
+            if not request.is_json:
+                return error_response('Content-Type deve ser application/json ou multipart/form-data', 400)
+            data = request.get_json() or {}
+            assunto = (data.get('assunto') or '').strip()
+            mensagem = (data.get('mensagem') or '').strip()
+            if not assunto or not mensagem:
+                return error_response('Assunto e mensagem são obrigatórios', 400)
+            prioridade_alta = data.get('prioridade', False)
+            enviar_copia = data.get('enviar_copia', False)
+            modelo = data.get('modelo', '')
 
         # Verificar se o chamado existe
         chamado = Chamado.query.get(chamado_id)
