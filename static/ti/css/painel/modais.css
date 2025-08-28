@@ -83,3 +83,27 @@
     max-width: calc(100vw - calc(var(--spacing-sm) * 2));
   }
 }
+
+/* Modais responsivos (Bootstrap) para histórico de chamados e similares */
+.responsive-modal .modal-dialog {
+  width: auto;
+  max-width: 95vw;
+  margin: 1rem auto;
+}
+
+@media (min-width: 992px) {
+  .responsive-modal .modal-dialog {
+    max-width: 900px;
+  }
+}
+
+.responsive-modal .modal-content {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.responsive-modal .modal-body {
+  overflow: auto;
+  max-height: calc(90vh - 8rem);
+}
