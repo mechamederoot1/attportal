@@ -122,7 +122,14 @@ btnEnviarTicket.addEventListener('click', async function() {
         }
 
         const data = await response.json();
-        alert('Ticket enviado com sucesso!');
+        let successMessage = 'Ticket enviado com sucesso!';
+
+        // Adicionar informação sobre anexos se houver
+        if (data.ticket && data.ticket.anexos_enviados > 0) {
+            successMessage += `\n\n📎 ${data.ticket.anexos_enviados} anexo(s) incluído(s) no e-mail.`;
+        }
+
+        alert(successMessage);
         closeTicketModal();
         
     } catch (error) {
