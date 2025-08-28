@@ -116,70 +116,91 @@ def enviar_email(assunto, corpo, destinatarios=None, anexos=None):
     if destinatarios is None:
         destinatarios = [EMAIL_TI]
 
-    current_app.logger.info(f"📧 === INICIANDO ENVIO DE EMAIL ===")
+    current_app.logger.info("📧 === INICIANDO ENVIO DE EMAIL ===")
     current_app.logger.info(f"📧 Destinatários: {destinatarios}")
     current_app.logger.info(f"📋 Assunto: {assunto}")
     current_app.logger.info(f"📄 Tamanho do corpo: {len(corpo)} caracteres")
-
-    token = get_access_token()
-    if not token:
-        current_app.logger.error("❌ Token não obtido, não é possível enviar e-mail")
-        return False
-
-    current_app.logger.info(f"🔑 Token obtido: {token[:20]}...")
-    current_app.logger.info(f"🌐 Endpoint: {ENDPOINT}")
-
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-
-    email_data = {
-        "message": {
-            "subject": assunto,
-            "body": {
-                "contentType": "Text",
-                "content": corpo
-            },
-            "toRecipients": [
-                {"emailAddress": {"address": addr}} for addr in destinatarios
-            ]
-        },
-        "saveToSentItems": "false"
-    }
-
-    # Incluir anexos se houver
     if anexos:
-        import base64
-        attachments_payload = []
-        for anexo in anexos:
-            nome = anexo.get('nome')
-            tipo = anexo.get('content_type') or 'application/octet-stream'
-            dados = anexo.get('dados')
-            if not (nome and dados is not None):
-                continue
-            content_b64 = base64.b64encode(dados).decode('utf-8')
-            attachments_payload.append({
-                "@odata.type": "#microsoft.graph.fileAttachment",
-                "name": nome,
-                "contentType": tipo,
-                "contentBytes": content_b64
-            })
-        if attachments_payload:
-            email_data["message"]["attachments"] = attachments_payload
+        try:
+            nomes_anexos = [a.get('nome') for a in anexos if a.get('nome')]
+            tamanhos = [len(a.get('dados') or b'') for a in anexos]
+            current_app.logger.info(f"📎 Anexos: {nomes_anexos} (tamanhos: {tamanhos})")
+        except Exception:
+            current_app.logger.info("📎 Anexos presentes, detalhes indisponíveis para log")
 
-    current_app.logger.info(f"📦 Email data preparado para: {[r['emailAddress']['address'] for r in email_data['message']['toRecipients']]}")
+    # Tentar via Microsoft Graph
+    token = get_access_token()
+    if token:
+        current_app.logger.info(f"🔑 Token obtido: {token[:20]}...")
+        current_app.logger.info(f"🌐 Endpoint: {ENDPOINT}")
 
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        email_data = {
+            "message": {
+                "subject": assunto,
+                "body": {
+                    "contentType": "Text",
+                    "content": corpo
+                },
+                "toRecipients": [
+                    {"emailAddress": {"address": addr}} for addr in destinatarios
+                ]
+            },
+            "saveToSentItems": False
+        }
+
+        # Incluir anexos se houver
+        if anexos:
+            import base64
+            attachments_payload = []
+            for anexo in anexos:
+                nome = anexo.get('nome')
+                tipo = anexo.get('content_type') or 'application/octet-stream'
+                dados = anexo.get('dados')
+                if not (nome and dados is not None):
+                    continue
+                content_b64 = base64.b64encode(dados).decode('utf-8')
+                attachments_payload.append({
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": nome,
+                    "contentType": tipo,
+                    "contentBytes": content_b64
+                })
+            if attachments_payload:
+                email_data["message"]["attachments"] = attachments_payload
+
+        current_app.logger.info(f"📦 Email data preparado para: {[r['emailAddress']['address'] for r in email_data['message']['toRecipients']]}" )
+
+        try:
+            response = requests.post(ENDPOINT, headers=headers, json=email_data)
+            if response.status_code == 202:
+                current_app.logger.info("✅ E-mail enviado com sucesso via Microsoft Graph!")
+                return True
+            else:
+                current_app.logger.error(f"❌ Falha no Graph. Status: {response.status_code} | Body: {response.text}")
+        except Exception as e:
+            current_app.logger.error(f"❌ Erro na requisição Graph: {str(e)}")
+    else:
+        current_app.logger.warning("⚠️ Microsoft Graph não configurado. Tentando fallback SMTP...")
+
+    # Fallback via SMTP (email_service) com suporte a anexos
     try:
-        response = requests.post(ENDPOINT, headers=headers, json=email_data)
-        if response.status_code == 202:
-            current_app.logger.info("���� E-mail enviado com sucesso!")
+        from setores.ti.email_service import email_service
+        sucesso_smtp = True
+        for dest in destinatarios:
+            if not email_service.enviar_email(dest, assunto, corpo.replace('\n', '<br>'), corpo, anexos=anexos):
+                sucesso_smtp = False
+        if sucesso_smtp:
+            current_app.logger.info("✅ E-mail enviado com sucesso via SMTP (fallback)")
             return True
-        else:
-            current_app.logger.error(f"❌ Falha ao enviar e-mail. Status: {response.status_code}")
-            return False
-    except Exception as e:
-        current_app.logger.error(f"❌ Erro na requisi��ão: {str(e)}")
+        current_app.logger.error("❌ Falha ao enviar via SMTP (fallback)")
+        return False
+    except Exception as smtp_err:
+        current_app.logger.error(f"❌ Erro no fallback SMTP: {str(smtp_err)}")
         return False
 
 def gerar_codigo_chamado():
