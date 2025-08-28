@@ -15,38 +15,60 @@ class EmailService:
         self.email_username = os.getenv('MICROSOFT_GRAPH_USERNAME')
         self.email_password = os.getenv('MICROSOFT_GRAPH_PASSWORD')
         self.from_email = os.getenv('MICROSOFT_GRAPH_USERNAME')
-        
-    def enviar_email(self, destinatario, assunto, corpo_html, corpo_texto=None):
-        """Envia um email usando as configurações do Microsoft Graph"""
+
+    def enviar_email(self, destinatario, assunto, corpo_html, corpo_texto=None, anexos=None):
+        """Envia um email via SMTP com suporte a anexos"""
         try:
             if not all([self.email_username, self.email_password]):
                 logger.error("Credenciais de email não configuradas")
                 return False
-                
+
             # Criar mensagem
-            msg = MIMEMultipart('alternative')
+            msg = MIMEMultipart()
             msg['From'] = self.from_email
             msg['To'] = destinatario
             msg['Subject'] = assunto
-            
-            # Adicionar versão texto se fornecida
+
+            # Parte alternativa (texto/HTML)
+            alt = MIMEMultipart('alternative')
             if corpo_texto:
                 parte_texto = MIMEText(corpo_texto, 'plain', 'utf-8')
-                msg.attach(parte_texto)
-            
-            # Adicionar versão HTML
+                alt.attach(parte_texto)
             parte_html = MIMEText(corpo_html, 'html', 'utf-8')
-            msg.attach(parte_html)
-            
+            alt.attach(parte_html)
+            msg.attach(alt)
+
+            # Anexos
+            if anexos:
+                from email.mime.base import MIMEBase
+                from email import encoders
+                for anexo in anexos:
+                    try:
+                        nome = anexo.get('nome')
+                        dados = anexo.get('dados')
+                        content_type = anexo.get('content_type') or 'application/octet-stream'
+                        if not (nome and dados is not None):
+                            continue
+                        maintype, _, subtype = content_type.partition('/')
+                        part = MIMEBase(maintype, subtype or 'octet-stream')
+                        part.set_payload(dados)
+                        encoders.encode_base64(part)
+                        part.add_header('Content-Disposition', 'attachment', filename=nome)
+                        if content_type:
+                            part.add_header('Content-Type', content_type)
+                        msg.attach(part)
+                    except Exception as attach_err:
+                        logger.warning(f"Falha ao anexar arquivo '{anexo.get('nome')}': {attach_err}")
+
             # Conectar e enviar
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.email_username, self.email_password)
                 server.send_message(msg)
-                
+
             logger.info(f"Email enviado com sucesso para {destinatario}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Erro ao enviar email para {destinatario}: {str(e)}")
             return False
