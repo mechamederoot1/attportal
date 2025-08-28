@@ -70,6 +70,14 @@
   border-top: 1px solid var(--border-color);
 }
 
+/* Anexos no modal de chamado */
+#modalChamado .attachments-section { margin-top: var(--spacing-md); }
+#modalChamado .attachments-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+#modalChamado .attachment-item { display: flex; align-items: center; justify-content: space-between; background: var(--dark-color); border: 1px solid var(--border-color); border-radius: 8px; padding: var(--spacing-md); }
+#modalChamado .attachment-info { flex: 1; margin: 0 var(--spacing-md); }
+#modalChamado .attachment-name { font-weight: 600; }
+#modalChamado .attachment-meta { color: var(--text-muted); font-size: .85rem; }
+
 @media (max-width: 768px) {
   #modalChamado .modal-content,
   #modalTicket .modal-content,
