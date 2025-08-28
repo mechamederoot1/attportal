@@ -62,3 +62,9 @@
 .historico-modal .timeline-marker.bg-warning { background: var(--warning-color); color: #000; }
 .historico-modal .timeline-marker.bg-danger { background: var(--danger-color); }
 .historico-modal .timeline-marker.bg-secondary { background: var(--bg-tertiary); color: var(--text-primary); }
+
+/* Correções visuais e centralização adequada */
+.historico-modal { z-index: 3000; }
+.historico-modal .modal-body { word-break: break-word; }
+.historico-modal .modal-dialog { margin: 1.75rem auto; }
+.historico-modal .card.bg-secondary { background: var(--bg-tertiary) !important; border-color: var(--border-color); }
