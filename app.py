@@ -559,9 +559,11 @@ def migrar_ticket_anexos():
         );
         """
 
-        # Executar SQL
+        # Executar SQL usando SQLAlchemy 2.0 syntax
         from sqlalchemy import text
-        db.engine.execute(text(create_table_sql))
+        with db.engine.connect() as conn:
+            conn.execute(text(create_table_sql))
+            conn.commit()
         resultado.append("✅ Tabela 'ticket_anexos' criada com sucesso!")
 
         # Verificar se a tabela foi criada
