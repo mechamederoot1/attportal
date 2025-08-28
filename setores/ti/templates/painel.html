@@ -137,22 +137,10 @@
           </ul>
         </li>
 
-        <li class="has-submenu" tabindex="0" aria-haspopup="true" aria-expanded="false">
-          <a href="#" class="submenu-toggle" aria-controls="submenu-historico" aria-expanded="false" tabindex="0">
-            <i class="fas fa-history"></i><span>Histórico</span>
+        <li>
+          <a href="#historico-chamados" tabindex="0">
+            <i class="fas fa-history"></i><span>Histórico de Chamados</span>
           </a>
-          <ul class="submenu" id="submenu-historico" aria-label="submenu histórico" role="menu">
-            <li role="none">
-              <a href="#historico-chamados" role="menuitem" tabindex="-1">
-                <i class="fas fa-ticket-alt"></i><span>Histórico de Chamados</span>
-              </a>
-            </li>
-            <li role="none">
-              <a href="#historico-transferencias" role="menuitem" tabindex="-1">
-                <i class="fas fa-exchange-alt"></i><span>Histórico de Transferências</span>
-              </a>
-            </li>
-          </ul>
         </li>
         <li><a href="#configuracoes" tabindex="0"><i class="fas fa-cog"></i><span>Configurações</span></a></li>
       </ul>
@@ -2327,7 +2315,7 @@
                   <input type="number" class="form-control" id="prazoSLA" value="24" min="1" max="168">
                 </div>
                 <div class="mb-3">
-                  <label for="prioridadePadrao" class="form-label">Prioridade padrão</label>
+                  <label for="prioridadePadrao" class="form-label">Prioridade padr��o</label>
                   <select class="form-control" id="prioridadePadrao">
                     <option value="Baixa">Baixa</option>
                     <option value="Normal" selected>Normal</option>
@@ -3074,7 +3062,7 @@
             console.log('Links encontrados após DOMContentLoaded:', links.length);
             console.log('Seções encontradas após DOMContentLoaded:', sections.length);
 
-            // Se não há navegação ativa, forçar inicialização
+            // Se não há navegaç��o ativa, forçar inicialização
             if (links.length > 0 && sections.length > 0) {
                 console.log('Elementos encontrados, configurando navegação...');
 
@@ -3165,7 +3153,7 @@
                     });
                 }
                 
-                console.log('Configurações de notificações carregadas:', configuracaoNotificacoes);
+                console.log('Configurações de notificaç��es carregadas:', configuracaoNotificacoes);
             }
         } catch (error) {
             console.error('Erro ao carregar configurações de notificações:', error);
