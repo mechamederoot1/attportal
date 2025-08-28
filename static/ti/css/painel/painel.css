@@ -1442,6 +1442,20 @@ select option:checked {
     color: var(--light-color);
 }
 
+/* Botões padrão para modais custom (aplicado também ao modalChamado) */
+.modal .btn-ticket {
+  background: var(--info-color);
+  color: white;
+}
+.modal .btn-update {
+  background: var(--success-color);
+  color: white;
+}
+.modal .btn-cancel {
+  background: var(--border-color);
+  color: var(--light-color);
+}
+
 #modalNotificacoes .modal-footer button:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
