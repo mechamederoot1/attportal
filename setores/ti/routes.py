@@ -112,7 +112,16 @@ def testar_configuracao_email():
         current_app.logger.error(f"🔍 Stack trace: {traceback.format_exc()}")
         return False
 
-def enviar_email(assunto, corpo, destinatarios=None):
+def enviar_email(assunto, corpo, destinatarios=None, anexos=None):
+    """
+    Envia email via Microsoft Graph API com suporte a anexos
+
+    Args:
+        assunto (str): Assunto do email
+        corpo (str): Corpo do email
+        destinatarios (list): Lista de emails de destino
+        anexos (list): Lista de anexos (objetos ChamadoAnexo ou caminhos de arquivo)
+    """
     if destinatarios is None:
         destinatarios = [EMAIL_TI]
 
@@ -120,6 +129,7 @@ def enviar_email(assunto, corpo, destinatarios=None):
     current_app.logger.info(f"📧 Destinatários: {destinatarios}")
     current_app.logger.info(f"📋 Assunto: {assunto}")
     current_app.logger.info(f"📄 Tamanho do corpo: {len(corpo)} caracteres")
+    current_app.logger.info(f"📎 Anexos: {len(anexos) if anexos else 0}")
 
     token = get_access_token()
     if not token:
@@ -148,6 +158,61 @@ def enviar_email(assunto, corpo, destinatarios=None):
         "saveToSentItems": "false"
     }
 
+    # Processar anexos se fornecidos
+    if anexos:
+        import base64
+        import os
+        attachments = []
+
+        for anexo in anexos:
+            try:
+                # Se for um objeto ChamadoAnexo
+                if hasattr(anexo, 'caminho_arquivo'):
+                    file_path = anexo.caminho_arquivo
+                    file_name = anexo.nome_original
+                    content_type = anexo.tipo_mime
+                # Se for um caminho de arquivo direto
+                elif isinstance(anexo, str):
+                    file_path = anexo
+                    file_name = os.path.basename(file_path)
+                    content_type = "application/octet-stream"
+                else:
+                    continue
+
+                # Verificar se arquivo existe
+                if not os.path.exists(file_path):
+                    current_app.logger.warning(f"⚠️ Arquivo não encontrado: {file_path}")
+                    continue
+
+                # Verificar tamanho do arquivo (limite do Graph API é ~25MB)
+                file_size = os.path.getsize(file_path)
+                if file_size > 25 * 1024 * 1024:  # 25MB
+                    current_app.logger.warning(f"⚠️ Arquivo muito grande para anexo: {file_name} ({file_size} bytes)")
+                    continue
+
+                # Ler e codificar arquivo em base64
+                with open(file_path, 'rb') as f:
+                    file_content = f.read()
+                    encoded_content = base64.b64encode(file_content).decode('utf-8')
+
+                attachment = {
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": file_name,
+                    "contentType": content_type,
+                    "contentBytes": encoded_content
+                }
+
+                attachments.append(attachment)
+                current_app.logger.info(f"📎 Anexo preparado: {file_name} ({file_size} bytes)")
+
+            except Exception as e:
+                current_app.logger.error(f"❌ Erro ao processar anexo: {str(e)}")
+                continue
+
+        if attachments:
+            email_data["message"]["attachments"] = attachments
+            current_app.logger.info(f"📎 {len(attachments)} anexos adicionados ao email")
+
     current_app.logger.info(f"📦 Email data preparado para: {[r['emailAddress']['address'] for r in email_data['message']['toRecipients']]}")
 
     try:
@@ -157,6 +222,7 @@ def enviar_email(assunto, corpo, destinatarios=None):
             return True
         else:
             current_app.logger.error(f"❌ Falha ao enviar e-mail. Status: {response.status_code}")
+            current_app.logger.error(f"❌ Response: {response.text}")
             return False
     except Exception as e:
         current_app.logger.error(f"❌ Erro na requisição: {str(e)}")
