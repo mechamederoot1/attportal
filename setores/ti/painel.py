@@ -1286,10 +1286,11 @@ def transferir_chamado_agente(chamado_id):
 @painel_bp.route('/api/chamados/<int:chamado_id>/ticket', methods=['POST'])
 @api_login_required
 def enviar_ticket_chamado(chamado_id):
-    """Envia ticket/comunicação relacionado a um chamado específico"""
+    """Envia ticket/comunicação relacionado a um chamado específico, salvando anexos no chamado"""
     try:
         data = {}
         anexos_payload = []
+        anexos_salvos = []
         content_type = request.content_type or ''
 
         if content_type.startswith('multipart/form-data'):
@@ -1298,20 +1299,29 @@ def enviar_ticket_chamado(chamado_id):
             mensagem = (form.get('mensagem') or '').strip()
             if not assunto or not mensagem:
                 return error_response('Assunto e mensagem são obrigatórios', 400)
-            # Coletar anexos
+            # Coletar anexos e salvar no chamado
             try:
                 files = request.files.getlist('anexos')
             except Exception:
                 files = []
-            for f in files or []:
-                try:
-                    anexos_payload.append({
-                        'nome': f.filename,
-                        'content_type': f.mimetype,
-                        'dados': f.read()
-                    })
-                except Exception:
-                    continue
+            if files:
+                from setores.ti.anexos_utils import save_uploaded_file
+                for f in files:
+                    ok, msg, anexo_obj = save_uploaded_file(f, chamado_id, current_user.id)
+                    if ok and anexo_obj:
+                        anexos_salvos.append(anexo_obj)
+                        try:
+                            # Ler bytes do arquivo salvo para anexar ao e-mail
+                            with open(anexo_obj.caminho_arquivo, 'rb') as fh:
+                                anexos_payload.append({
+                                    'nome': anexo_obj.nome_original,
+                                    'content_type': anexo_obj.tipo_mime,
+                                    'dados': fh.read()
+                                })
+                        except Exception:
+                            continue
+                    else:
+                        return error_response(msg or 'Falha ao salvar anexo', 400)
             prioridade_alta = form.get('prioridade', 'false').lower() == 'true'
             enviar_copia = form.get('enviar_copia', 'false').lower() == 'true'
             modelo = form.get('modelo') or ''
@@ -1338,7 +1348,7 @@ def enviar_ticket_chamado(chamado_id):
             return error_response('Usuário não tem permissão para enviar tickets', 403)
 
         if agente:
-            # Verificar se o chamado está atribu��do ao agente
+            # Verificar se o chamado está atribuído ao agente
             atribuicao = ChamadoAgente.query.filter_by(
                 chamado_id=chamado_id,
                 agente_id=agente.id,
@@ -1349,9 +1359,9 @@ def enviar_ticket_chamado(chamado_id):
                 return error_response('Chamado não está atribuído a você', 403)
 
         # Extrair outros dados opcionais
-        prioridade_alta = data.get('prioridade', False)
-        enviar_copia = data.get('enviar_copia', False)
-        modelo = data.get('modelo', '')
+        prioridade_alta = data.get('prioridade', prioridade_alta if 'prioridade_alta' in locals() else False)
+        enviar_copia = data.get('enviar_copia', enviar_copia if 'enviar_copia' in locals() else False)
+        modelo = data.get('modelo', modelo if 'modelo' in locals() else '')
 
         # Preparar informações do ticket
         prioridade_texto = 'ALTA PRIORIDADE' if prioridade_alta else 'Prioridade Normal'
@@ -1383,14 +1393,10 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
 """
 
         # Preparar lista de destinatários
-        destinatarios = [chamado.email]  # Sempre enviar para o solicitante
-
+        destinatarios = [chamado.email]
         if enviar_copia:
-            # Adicionar e-mail do agente/usuário atual
             if current_user.email and current_user.email not in destinatarios:
                 destinatarios.append(current_user.email)
-
-            # Adicionar e-mail de TI se disponível
             email_ti = os.getenv('EMAIL_TI')
             if email_ti and email_ti not in destinatarios:
                 destinatarios.append(email_ti)
@@ -1399,18 +1405,16 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
         try:
             from setores.ti.routes import enviar_email
             sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios, anexos=anexos_payload)
-
             if not sucesso_email:
                 logger.warning(f"Falha ao enviar e-mail do ticket para chamado {chamado.codigo}")
                 return error_response('Falha ao enviar e-mail. Verifique as configurações de e-mail.')
-
         except Exception as email_error:
             logger.error(f"Erro ao enviar e-mail do ticket: {str(email_error)}")
             return error_response('Erro ao enviar e-mail. Tente novamente.')
 
         # Registrar no histórico do chamado
         try:
-            qtd_anexos = len(anexos_payload) if 'anexos_payload' in locals() else 0
+            qtd_anexos = len(anexos_payload)
             historico = HistoricoTicket(
                 chamado_id=chamado.id,
                 acao='Ticket enviado',
@@ -1458,7 +1462,8 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
                 'assunto': assunto,
                 'destinatarios': destinatarios,
                 'prioridade': prioridade_texto,
-                'data_envio': get_brazil_time().strftime('%d/%m/%Y %H:%M:%S')
+                'data_envio': get_brazil_time().strftime('%d/%m/%Y %H:%M:%S'),
+                'anexos_salvos': len(anexos_salvos)
             }
         })
 
