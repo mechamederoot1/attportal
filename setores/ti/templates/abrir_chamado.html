@@ -815,6 +815,257 @@
                 navbar.classList.remove("scrolled");
             }
         });
+
+        // ==================== FUNCIONALIDADE DE ANEXOS ====================
+
+        let selectedFiles = [];
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB
+        const ALLOWED_TYPES = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp',
+            'video/mp4', 'video/avi', 'video/quicktime', 'video/x-ms-wmv', 'video/x-flv',
+            'video/webm', 'video/x-matroska',
+            'application/pdf', 'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'text/plain'
+        ];
+
+        // Configurar drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        const anexosSection = document.getElementById('anexosSection');
+        const fileInput = document.getElementById('fileInput');
+        const anexosList = document.getElementById('anexosList');
+        const anexosInfo = document.getElementById('anexosInfo');
+
+        // Eventos de drag and drop
+        uploadArea.addEventListener('dragover', handleDragOver);
+        uploadArea.addEventListener('dragleave', handleDragLeave);
+        uploadArea.addEventListener('drop', handleDrop);
+
+        // Evento de seleção de arquivos
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            anexosSection.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            if (!anexosSection.contains(e.relatedTarget)) {
+                anexosSection.classList.remove('dragover');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            anexosSection.classList.remove('dragover');
+
+            const files = Array.from(e.dataTransfer.files);
+            addFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            addFiles(files);
+        }
+
+        function addFiles(files) {
+            for (let file of files) {
+                if (validateFile(file)) {
+                    // Verificar se já não foi adicionado
+                    const alreadyExists = selectedFiles.some(f =>
+                        f.name === file.name && f.size === file.size
+                    );
+
+                    if (!alreadyExists) {
+                        selectedFiles.push(file);
+                    }
+                }
+            }
+
+            updateFilesList();
+            updateInfo();
+        }
+
+        function validateFile(file) {
+            // Verificar tipo
+            if (!ALLOWED_TYPES.includes(file.type)) {
+                alert(`Tipo de arquivo não permitido: ${file.name}\nTipos aceitos: Imagens, Vídeos, Documentos`);
+                return false;
+            }
+
+            // Verificar tamanho individual
+            if (file.size > MAX_FILE_SIZE) {
+                alert(`Arquivo muito grande: ${file.name}\nTamanho máximo: 10MB`);
+                return false;
+            }
+
+            // Verificar tamanho total
+            const currentTotalSize = selectedFiles.reduce((total, f) => total + f.size, 0);
+            if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
+                alert(`Limite total de arquivos excedido.\nMáximo: 50MB por chamado`);
+                return false;
+            }
+
+            return true;
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFilesList();
+            updateInfo();
+        }
+
+        function updateFilesList() {
+            anexosList.innerHTML = '';
+
+            selectedFiles.forEach((file, index) => {
+                const fileItem = createFileItem(file, index);
+                anexosList.appendChild(fileItem);
+            });
+        }
+
+        function createFileItem(file, index) {
+            const item = document.createElement('div');
+            item.className = 'anexo-item';
+
+            const icon = getFileIcon(file.type);
+            const size = formatFileSize(file.size);
+
+            item.innerHTML = `
+                <div class="anexo-info">
+                    <div class="anexo-icon">
+                        <i class="${icon}"></i>
+                    </div>
+                    <div class="anexo-details">
+                        <div class="anexo-nome">${file.name}</div>
+                        <div class="anexo-tamanho">${size}</div>
+                    </div>
+                </div>
+                <div class="anexo-actions">
+                    <button type="button" class="btn-remove" onclick="removeFile(${index})" title="Remover arquivo">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            return item;
+        }
+
+        function getFileIcon(mimeType) {
+            if (mimeType.startsWith('image/')) {
+                return 'fas fa-image text-primary';
+            } else if (mimeType.startsWith('video/')) {
+                return 'fas fa-video text-danger';
+            } else if (mimeType === 'application/pdf') {
+                return 'fas fa-file-pdf text-danger';
+            } else if (mimeType.includes('word') || mimeType.includes('document')) {
+                return 'fas fa-file-word text-primary';
+            } else if (mimeType.includes('excel') || mimeType.includes('sheet')) {
+                return 'fas fa-file-excel text-success';
+            } else if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) {
+                return 'fas fa-file-powerpoint text-warning';
+            } else if (mimeType === 'text/plain') {
+                return 'fas fa-file-alt text-secondary';
+            } else {
+                return 'fas fa-file text-muted';
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+        }
+
+        function updateInfo() {
+            const totalFiles = selectedFiles.length;
+            const totalSize = selectedFiles.reduce((total, file) => total + file.size, 0);
+            const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
+
+            if (totalFiles > 0) {
+                anexosInfo.style.display = 'flex';
+                document.getElementById('totalAnexos').textContent =
+                    `${totalFiles} arquivo(s) selecionado(s)`;
+                document.getElementById('tamanhoTotal').textContent =
+                    `${totalSizeMB} MB / 50 MB`;
+            } else {
+                anexosInfo.style.display = 'none';
+            }
+        }
+
+        // Atualizar função abrirModal para incluir anexos
+        const originalAbrirModal = abrirModal;
+        abrirModal = function(event) {
+            event.preventDefault();
+
+            // Se tem arquivos selecionados, usar FormData para envio multipart
+            if (selectedFiles.length > 0) {
+                enviarChamadoComAnexos();
+            } else {
+                // Usar função original se não há anexos
+                originalAbrirModal(event);
+            }
+        };
+
+        function enviarChamadoComAnexos() {
+            const form = document.getElementById("chamadoForm");
+            const formData = new FormData();
+
+            // Adicionar campos do formulário
+            const selectUnidade = document.getElementById("unidadeSelect");
+            const unidadeNomeInput = document.getElementById("unidadeNomeInput");
+            unidadeNomeInput.value = selectUnidade.options[selectUnidade.selectedIndex].text;
+
+            // Adicionar todos os campos do formulário
+            const formInputs = form.querySelectorAll('input, select, textarea');
+            formInputs.forEach(input => {
+                if (input.type !== 'file' && input.name) {
+                    formData.append(input.name, input.value);
+                }
+            });
+
+            // Adicionar arquivos
+            selectedFiles.forEach((file, index) => {
+                formData.append('anexos', file);
+            });
+
+            // Mostrar modal de loading
+            const modal = new bootstrap.Modal(document.getElementById("modal"));
+            modal.show();
+
+            // Enviar formulário
+            fetch('/ti/abrir-chamado-com-anexos', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById("loadingIndicator").style.display = "none";
+                    document.getElementById("successContent").style.display = "block";
+                    document.getElementById("modalFooter").style.display = "block";
+                    document.querySelector(".modal-header h5").textContent = "Chamado criado com sucesso!";
+
+                    document.getElementById("codigoChamado").innerText = data.codigo_chamado;
+                    document.getElementById("protocoloChamado").innerText = data.protocolo_chamado;
+                } else {
+                    modal.hide();
+                    alert("Erro ao abrir chamado: " + (data.message || "Tente novamente."));
+                }
+            })
+            .catch(error => {
+                console.error("Erro:", error);
+                modal.hide();
+                alert("Erro ao abrir chamado. Tente novamente.");
+            });
+        }
     </script>
 </body>
 </html>
