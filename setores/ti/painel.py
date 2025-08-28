@@ -1370,10 +1370,21 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
             if email_ti and email_ti not in destinatarios:
                 destinatarios.append(email_ti)
 
+        # Buscar anexos do chamado para incluir no e-mail
+        anexos_chamado = chamado.get_anexos_ativos()
+
+        # Adicionar informação sobre anexos na mensagem se existirem
+        if anexos_chamado:
+            anexos_info = f"\n\n========== ANEXOS DO CHAMADO ({len(anexos_chamado)}) =========="
+            for anexo in anexos_chamado:
+                anexos_info += f"\n- {anexo.nome_original} ({anexo.get_tamanho_formatado()})"
+            anexos_info += "\n(Anexos incluídos neste e-mail)"
+            corpo_mensagem += anexos_info
+
         # Tentar enviar o e-mail
         try:
             from setores.ti.routes import enviar_email
-            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios)
+            sucesso_email = enviar_email(assunto_completo, corpo_mensagem, destinatarios, anexos_chamado)
 
             if not sucesso_email:
                 logger.warning(f"Falha ao enviar e-mail do ticket para chamado {chamado.codigo}")
