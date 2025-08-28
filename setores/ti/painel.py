@@ -1654,7 +1654,10 @@ def historico_chamados_completo():
                             'tamanho': anexo.get_tamanho_formatado(),
                             'tipo': anexo.get_tipo_arquivo(),
                             'usuario': f"{anexo.usuario_upload.nome} {anexo.usuario_upload.sobrenome}" if anexo.usuario_upload else 'Desconhecido'
-                        }
+                        },
+                        'anexo_id': anexo.id,
+                        'is_image': (anexo.tipo_mime or '').startswith('image/'),
+                        'preview_url': url_for('ti.preview_anexo', anexo_id=anexo.id)
                     })
             except Exception as e:
                 logger.warning(f"Erro ao buscar anexos para chamado {chamado.id}: {str(e)}")
