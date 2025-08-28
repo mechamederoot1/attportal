@@ -19,7 +19,7 @@
 #historico-chamados .problem-text { color: var(--text-primary); }
 #historico-chamados .description-text { color: var(--text-light); line-height: 1.5; }
 
-/* Modal Bootstrap dentro do histórico */
+/* Modal Bootstrap dentro do histórico (quando o modal está dentro da seção) */
 #historico-chamados .modal-content { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); }
 #historico-chamados .modal-header { background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color) !important; }
 #historico-chamados .modal-footer { background: var(--bg-tertiary); border-top: 1px solid var(--border-color) !important; }
@@ -42,3 +42,23 @@
 #historico-chamados .timeline-marker.bg-warning { background: var(--warning-color); color: #000; }
 #historico-chamados .timeline-marker.bg-danger { background: var(--danger-color); }
 #historico-chamados .timeline-marker.bg-secondary { background: var(--bg-tertiary); color: var(--text-primary); }
+
+/* Estilos quando o modal do histórico é anexado diretamente ao body */
+.historico-modal .modal-content { background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); }
+.historico-modal .modal-header { background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color) !important; }
+.historico-modal .modal-footer { background: var(--bg-tertiary); border-top: 1px solid var(--border-color) !important; }
+.historico-modal .btn-close, 
+.historico-modal .btn-close-white { filter: invert(1); opacity: .8; }
+.historico-modal .table { color: var(--text-primary); }
+.historico-modal .table.table-dark { background-color: var(--bg-secondary); color: var(--text-primary); }
+.historico-modal .table thead th { background: var(--bg-tertiary); color: var(--text-primary); border-color: var(--border-color); }
+.historico-modal .table tbody td { border-color: var(--border-color); color: var(--text-primary); }
+.historico-modal .timeline-container::before { background: var(--border-color); }
+.historico-modal .timeline-content { background: var(--bg-tertiary); border-left: 4px solid var(--border-color); }
+.historico-modal .timeline-marker { box-shadow: 0 0 0 2px var(--bg-secondary); }
+.historico-modal .timeline-marker.bg-primary { background: var(--accent-color); }
+.historico-modal .timeline-marker.bg-info { background: var(--info-color); }
+.historico-modal .timeline-marker.bg-success { background: var(--success-color); }
+.historico-modal .timeline-marker.bg-warning { background: var(--warning-color); color: #000; }
+.historico-modal .timeline-marker.bg-danger { background: var(--danger-color); }
+.historico-modal .timeline-marker.bg-secondary { background: var(--bg-tertiary); color: var(--text-primary); }
