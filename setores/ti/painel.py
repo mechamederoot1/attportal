@@ -1432,6 +1432,7 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
                     'remetente': f"{current_user.nome} {current_user.sobrenome}",
                     'destinatarios': destinatarios,
                     'prioridade': prioridade_texto,
+                    'anexos_enviados': len(anexos_chamado),
                     'timestamp': get_brazil_time().isoformat()
                 })
         except Exception as socket_error:
@@ -1445,6 +1446,7 @@ Sistema de Gerenciamento de Chamados - Evoque Fitness
                 'assunto': assunto,
                 'destinatarios': destinatarios,
                 'prioridade': prioridade_texto,
+                'anexos_enviados': len(anexos_chamado),
                 'data_envio': get_brazil_time().strftime('%d/%m/%Y %H:%M:%S')
             }
         })
