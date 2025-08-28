@@ -867,6 +867,43 @@ def download_anexo(anexo_id):
         current_app.logger.error(f"Erro no download do anexo {anexo_id}: {str(e)}")
         return jsonify({'error': 'Erro interno no servidor'}), 500
 
+@ti_bp.route('/preview-anexo/<int:anexo_id>')
+@login_required
+@setor_required('ti')
+def preview_anexo(anexo_id):
+    """Rota para pré-visualização inline de anexos (sem forçar download)"""
+    from database import ChamadoAnexo
+    from flask import send_file
+    import os
+
+    try:
+        anexo = ChamadoAnexo.query.get(anexo_id)
+        if not anexo or not anexo.ativo:
+            return jsonify({'error': 'Anexo não encontrado'}), 404
+
+        if (anexo.chamado.usuario_id != current_user.id and
+            not current_user.tem_permissao('Administrador') and
+            not current_user.eh_agente_suporte_ativo()):
+            return jsonify({'error': 'Sem permissão para acessar este anexo'}), 403
+
+        if not os.path.exists(anexo.caminho_arquivo):
+            current_app.logger.error(f"Arquivo não encontrado: {anexo.caminho_arquivo}")
+            return jsonify({'error': 'Arquivo não encontrado no servidor'}), 404
+
+        current_app.logger.info(f"Preview do anexo {anexo.nome_original} por usuário {current_user.id}")
+
+        # Envia inline (browser decide se exibe, especialmente para imagens/pdf)
+        return send_file(
+            anexo.caminho_arquivo,
+            as_attachment=False,
+            download_name=anexo.nome_original,
+            mimetype=anexo.tipo_mime
+        )
+
+    except Exception as e:
+        current_app.logger.error(f"Erro no preview do anexo {anexo_id}: {str(e)}")
+        return jsonify({'error': 'Erro interno no servidor'}), 500
+
 @ti_bp.route('/anexos/<int:chamado_id>')
 @login_required
 @setor_required('ti')

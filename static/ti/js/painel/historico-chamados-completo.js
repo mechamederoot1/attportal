@@ -462,11 +462,26 @@ class HistoricoCompletoManager {
                         <small class="text-muted">${this.formatarDataCompleta(evento.data)}</small>
                     </div>
                     <p class="mb-1">${evento.descricao}</p>
+                    ${evento.tipo === 'anexo' ? `
+                        <div class="mt-2 d-flex align-items-center gap-2">
+                            <a href="${evento.preview_url}" target="_blank" class="btn btn-sm btn-outline-info me-2">
+                                <i class="fas fa-eye me-1"></i> Visualizar
+                            </a>
+                            <a href="/ti/download-anexo/${evento.anexo_id}" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-download me-1"></i> Baixar
+                            </a>
+                        </div>
+                        ${evento.is_image ? `
+                            <div class="mt-2">
+                                <img src="${evento.preview_url}" alt="${(evento.detalhes && evento.detalhes.arquivo) || 'Anexo'}" style="max-width: 100%; height: auto; border-radius: 6px; border: 1px solid #495057;" />
+                            </div>
+                        ` : ''}
+                    ` : ''}
                     ${evento.detalhes ? `
                         <details class="mt-2">
                             <summary class="text-info" style="cursor: pointer;">Ver detalhes</summary>
                             <div class="mt-2 p-2 bg-secondary rounded">
-                                ${Object.entries(evento.detalhes).map(([key, value]) => 
+                                ${Object.entries(evento.detalhes).map(([key, value]) =>
                                     `<small><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</small><br>`
                                 ).join('')}
                             </div>
