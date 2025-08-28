@@ -2611,7 +2611,8 @@ def listar_chamados():
                     'visita_tecnica': c.visita_tecnica if hasattr(c, 'visita_tecnica') else False,
                     'agente': agente_info,
                     'agente_id': agente_info['id'] if agente_info else None,
-                    'total_anexos': c.get_total_anexos()
+                    'total_anexos': c.get_total_anexos(),
+                    'total_comunicacoes': HistoricoTicket.query.filter_by(chamado_id=c.id).count()
                 }
                 chamados_list.append(chamado_data)
                 logger.debug(f"Chamado {c.id} formatado com sucesso")
