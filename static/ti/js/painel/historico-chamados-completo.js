@@ -439,11 +439,11 @@ class HistoricoCompletoManager {
                         ` : ''}
                     </div>
                     <div class="modal-footer border-secondary">
-                        <button type="button" class="btn btn-info" onclick="this.closest('.modal').querySelector('[data-bs-dismiss=\"modal\"]').click(); window.historicoCompleto.mostrarTimelineChamado('${chamado.id}')">
+                        <button type="button" class="btn btn-info" id="btnVerTimeline-${chamado.id}">
                             <i class="fas fa-history me-1"></i>Ver Timeline
                         </button>
                         ${chamado.total_anexos > 0 ? `
-                            <button type="button" class="btn btn-success" onclick="this.closest('.modal').querySelector('[data-bs-dismiss=\"modal\"]').click(); window.historicoCompleto.mostrarAnexosChamado('${chamado.id}')">
+                            <button type="button" class="btn btn-success" id="btnVerAnexos-${chamado.id}">
                                 <i class="fas fa-paperclip me-1"></i>Ver Anexos
                             </button>
                         ` : ''}
