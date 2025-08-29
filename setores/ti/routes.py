@@ -1234,6 +1234,25 @@ def reabrir_chamado():
             'message': f'Erro interno: {str(e)}'
         }), 500
 
+@ti_bp.route('/api/configuracoes/reabertura', methods=['GET'])
+@login_required
+@setor_required('ti')
+def configuracoes_reabertura():
+    """Retorna configurações para reabertura de chamados"""
+    try:
+        # Buscar de Configuracao se existir, senão usar padrão 7 dias
+        from database import Configuracao
+        cfg = Configuracao.query.filter_by(chave='reabertura_chamados').first()
+        if cfg:
+            import json as _json
+            data = _json.loads(cfg.valor)
+            dias_limite = int(data.get('dias_limite', 7))
+        else:
+            dias_limite = 7
+        return jsonify({'dias_limite': dias_limite})
+    except Exception:
+        return jsonify({'dias_limite': 7})
+
 @ti_bp.route('/api/chamados/<int:chamado_id>/reaberturas', methods=['GET'])
 @login_required
 @setor_required('ti')
