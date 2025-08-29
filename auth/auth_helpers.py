@@ -6,7 +6,7 @@ from database import db
 
 def is_api_request():
     """Verifica se a requisição é para a API"""
-    return request.path.startswith('/api/')
+    return '/api/' in request.path
 
 def setor_required(*setores_necessarios):
     def decorator(f):

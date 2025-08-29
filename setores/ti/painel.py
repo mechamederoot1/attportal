@@ -1844,7 +1844,7 @@ def marcar_notificacao_lida(notificacao_id):
 
 @painel_bp.route('/api/sla/configuracoes', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_configuracoes_sla():
     """Retorna configurações de SLA"""
     try:
@@ -1868,7 +1868,7 @@ def obter_configuracoes_sla():
 
 @painel_bp.route('/api/sla/configuracoes', methods=['POST'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def salvar_configuracoes_sla_api():
     """Salva configurações de SLA"""
     try:
@@ -1956,7 +1956,7 @@ def salvar_configuracoes_sla_api():
 
 @painel_bp.route('/api/sla/metricas', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_metricas_sla():
     """Retorna métricas consolidadas de SLA"""
     try:
@@ -1987,7 +1987,7 @@ def obter_metricas_sla():
 
 @painel_bp.route('/api/sla/chamados', methods=['GET'])
 @login_required
-@setor_required('Administrador')
+@setor_required('ti')
 def obter_chamados_com_sla():
     """Retorna lista de chamados com informações detalhadas de SLA"""
     try:
@@ -2056,7 +2056,7 @@ def obter_chamados_com_sla():
 
 @painel_bp.route('/api/sla/dashboard', methods=['GET'])
 @login_required
-@setor_required('Administrador')
+@setor_required('ti')
 def obter_dashboard_sla():
     """Retorna dados completos para o dashboard de SLA"""
     try:
@@ -2563,7 +2563,7 @@ def remover_unidade(id):
 
 @painel_bp.route('/api/chamados', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def listar_chamados():
     try:
         logger.debug("Iniciando consulta de chamados...")
@@ -2639,7 +2639,7 @@ def listar_chamados():
 
 @painel_bp.route('/api/chamados/estatisticas', methods=['GET'])
 @login_required
-@setor_required('TI')
+@setor_required('ti')
 def obter_estatisticas_chamados():
     """Retorna estatísticas dos chamados por status"""
     try:

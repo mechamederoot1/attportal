@@ -228,7 +228,7 @@ with app.app_context():
         print("✅ Validação de entrada ativa")
         print("✅ Headers de segurança configurados")
         print("✅ Sistema de auditoria ativo")
-        print("✅ Proteção de sess��o ativa")
+        print("✅ Proteção de sessão ativa")
             
     except Exception as e:
         print(f"❌ Erro durante a inicialização do banco: {str(e)}")

@@ -43,7 +43,7 @@ class SLAMetricas {
 
             if (!metricasResponse.ok) {
                 if (metricasResponse.status === 401 || metricasResponse.status === 302) {
-                    throw new Error('N��o autenticado. Faça login para acessar as métricas SLA.');
+                    throw new Error('Não autenticado. Faça login para acessar as métricas SLA.');
                 }
                 throw new Error(`HTTP error! status: ${metricasResponse.status}`);
             }
