@@ -419,7 +419,7 @@ window.debugNavigation = function() {
         console.log(`${index + 1}. ID: "${section.id}" | Ativa: ${isActive} | Display: ${display}`);
     });
 
-    console.log('=== LINKS DE NAVEGAÇÃO ===');
+    console.log('=== LINKS DE NAVEGA��ÃO ===');
     navLinks.forEach((link, index) => {
         const href = link.getAttribute('href');
         const isActive = link.classList.contains('active');
@@ -2259,7 +2259,7 @@ function attachBloqueadosEventListeners() {
 }
 
 // Função para carregar conteúdo específico da seção quando ativada
-function loadSectionContent(sectionId) {
+function baseLoadSectionContentExtended(sectionId) {
     console.log('Carregando conteúdo da seção:', sectionId);
 
     switch(sectionId) {
@@ -3456,10 +3456,7 @@ async function excluirGrupo(grupoId) {
 
 // Garantir que agentes e grupos sejam carregados corretamente
 function loadSectionContentEnhanced(sectionId) {
-    // Chamar a funç��o original primeiro
-    if (typeof loadSectionContent === 'function') {
-        loadSectionContent(sectionId);
-    }
+    // Evitar recursão: o wrapper chamará as partes base; aqui adicionamos apenas extras.
 
     // Adicionar funcionalidades específicas
     switch(sectionId) {
@@ -3495,11 +3492,23 @@ function loadSectionContentEnhanced(sectionId) {
 if (typeof loadSectionContent !== 'undefined') {
     const originalFunction = loadSectionContent;
     loadSectionContent = function(sectionId) {
+        // Executa a função base original
         originalFunction(sectionId);
+        // Executa a extensão base adicional, se existir
+        if (typeof baseLoadSectionContentExtended === 'function') {
+            baseLoadSectionContentExtended(sectionId);
+        }
+        // Executa melhorias extras
         loadSectionContentEnhanced(sectionId);
     };
 } else {
-    loadSectionContent = loadSectionContentEnhanced;
+    // Caso a função base não exista, usar a extensão e os aprimoramentos
+    loadSectionContent = function(sectionId) {
+        if (typeof baseLoadSectionContentExtended === 'function') {
+            baseLoadSectionContentExtended(sectionId);
+        }
+        loadSectionContentEnhanced(sectionId);
+    };
 }
 
 // Placeholder functions para funcionalidades futuras
